@@ -1,0 +1,4 @@
+# Token 2b IQ 插件在 profile 中的装载行。由 dsh.bundle.patch 引用。
+- insert:
+    - id: dsh-token2biq
+      name: dsh-token2biq

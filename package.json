@@ -1,0 +1,60 @@
+{
+  "name": "dsh-token2biq",
+  "version": "0.4.2",
+  "description": "Token 2b IQ — a multi-agent orchestration controller for DeepSeek Harness: tiers, receipts, token ledger and run panel. Trades measurable token spend for first-pass correctness, on top of the official Agent Teams.",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": { "default": "./lib/index.js" },
+    "./client": { "default": "./lib/client.js" },
+    "./package.json": "./package.json",
+    "./locale/en.json": "./locale/en.json",
+    "./locale/zh.json": "./locale/zh.json",
+    "./icon.svg": "./icon.svg"
+  },
+  "files": [
+    "lib/",
+    "cordis.patch.yml",
+    "locale/",
+    "icon.svg",
+    "README.md",
+    "README.en.md"
+  ],
+  "license": "MIT",
+  "keywords": [
+    "deepseek",
+    "harness",
+    "dsh",
+    "dsh-plugin",
+    "multi-agent",
+    "orchestration",
+    "agent-teams",
+    "token-budget",
+    "code-review",
+    "pipeline"
+  ],
+  "author": "SSRYLJRSS",
+  "homepage": "https://github.com/SSRYLJRSS/dsh-token2biq#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SSRYLJRSS/dsh-token2biq.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SSRYLJRSS/dsh-token2biq/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": ["@deepseek-ai/dsh-client-connection"]
+    },
+    "compatibility": {
+      "dsh": ">=0.2.0-rc.1 <0.3.0-0"
+    }
+  }
+}
