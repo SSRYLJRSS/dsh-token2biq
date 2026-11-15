@@ -51,7 +51,7 @@ const route = routes['prefix /token2biq'];
 }
 {
   const res = mockRes();
-  const req = { method: 'POST', url: '/token2biq/action' };
+  const req = { method: 'POST', url: '/token2biq/action', headers: { 'content-type': 'application/json' } };
   req.on = (ev, cb) => { if (ev === 'data') cb(JSON.stringify({ action: 'help' })); if (ev === 'end') cb(); return req; };
   await route(req, res);
   const j = JSON.parse(res.body);

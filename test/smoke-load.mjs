@@ -44,7 +44,7 @@ const route = routes['prefix /token2biq'];
 }
 {
   const res = mockRes();
-  const req = { method: 'POST', url: '/token2biq/mode' };
+  const req = { method: 'POST', url: '/token2biq/mode', headers: { 'content-type': 'application/json' } };
   req.on = (ev, cb) => { if (ev === 'data') cb(JSON.stringify({ mode: 'S2' })); if (ev === 'end') cb(); return req; };
   await route(req, res);
   ok(res.code === 200 && /"mode":"S2"/.test(res.body), 'POST /token2biq/mode 切到 S2');
