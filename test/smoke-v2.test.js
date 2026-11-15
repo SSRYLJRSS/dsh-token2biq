@@ -28,7 +28,7 @@ function makeCtx(modelCatalog) {
   return { ctx, captured };
 }
 
-function callRoute(handler, { method = 'GET', url = '/token2biq/settings', body } = {}) {
+function callRoute(handler, { method = 'GET', url = '/token2biq/settings', body, headers } = {}) {
   return new Promise((resolve) => {
     const res = {
       status: 0, headers: {}, body: '',
@@ -36,7 +36,7 @@ function callRoute(handler, { method = 'GET', url = '/token2biq/settings', body 
       end(s) { this.body = s == null ? '' : String(s); resolve(this); },
     };
     const req = {
-      method, url,
+      method, url, headers: headers || {},
       on(ev, cb) {
         if (ev === 'data' && body !== undefined) cb(Buffer.from(JSON.stringify(body), 'utf8'));
         else if (ev === 'end') cb();
@@ -70,7 +70,7 @@ test('GET /token2biq/settings 返回设置；POST 可改并持久化', async () 
   assert.equal(r1.status, 200);
   assert.equal(JSON.parse(r1.body).settings.forceTeam, 'auto');
 
-  const r2 = await callRoute(captured.handler, { method: 'POST', url: '/token2biq/settings', body: { forceTeam: true, defaultMode: 'S2', roleModels: { review: 'a::b' } } });
+  const r2 = await callRoute(captured.handler, { method: 'POST', url: '/token2biq/settings', body: { forceTeam: true, defaultMode: 'S2', roleModels: { review: 'a::b' } }, headers: { 'content-type': 'application/json' } });
   assert.equal(r2.status, 200);
   const s2 = JSON.parse(r2.body).settings;
   assert.equal(s2.forceTeam, 'on');

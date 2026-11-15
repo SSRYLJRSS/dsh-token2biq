@@ -58,9 +58,9 @@ function makeCtx() {
 function callRoute(handler, { method = 'GET', url, body, headers } = {}) {
   return new Promise((resolve) => {
     const res = {
-      status: 0, headers: {}, body: '',
-      writeHead(c, h) { this.status = c; this.headers = h || {}; },
-      end(s) { this.body = s == null ? '' : String(s); resolve(this); },
+      status: 0, statusCode: 0, headers: {}, body: '',
+      writeHead(c, h) { this.status = c; this.statusCode = c; this.headers = h || {}; },
+      end(s) { this.status = this.statusCode || this.status; this.body = s == null ? '' : String(s); resolve(this); },
     };
     const req = {
       method, url, headers: headers || {},
@@ -79,7 +79,7 @@ test('HTTP POST：拒绝跨站 Origin（403），非 JSON content-type（415）�
   apply(ctx, { stateFile: null, settingsFile: join(tmpdir(), `t2biq-org-${process.pid}-${Date.now()}.json`) });
   const r1 = await callRoute(captured.handler, { method: 'POST', url: '/token2biq/settings', body: { forceTeam: 'off' }, headers: { origin: 'http://evil.com' } });
   assert.equal(r1.status, 403);
-  const r2 = await callRoute(captured.handler, { method: 'POST', url: '/token2biq/settings', body: { forceTeam: 'off' }, headers: { origin: 'http://127.0.0.1:61000' } });
+  const r2 = await callRoute(captured.handler, { method: 'POST', url: '/token2biq/settings', body: { forceTeam: 'off' }, headers: { origin: 'http://127.0.0.1:61000', 'content-type': 'application/json' } });
   assert.equal(r2.status, 200);
   const r3 = await callRoute(captured.handler, { method: 'POST', url: '/token2biq/settings', body: { forceTeam: 'off' }, headers: { 'content-type': 'text/plain' } });
   assert.equal(r3.status, 415);

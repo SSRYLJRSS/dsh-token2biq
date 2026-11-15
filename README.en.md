@@ -78,13 +78,13 @@ Settings live in `~/.dsh/token2biq/settings.json`. Hard-enforced on `record`: `f
 3. `pipelineGate` defaults to `off` (see the A/B note above).
 4. "Real token" is process-wide (host `llm/stream` usage carries no `runId`), so it can be higher than one run's true cost.
 5. `generate` is serial by default (shared cwd, no file lock); parallel tasks need disjoint `writeScopes`.
-6. HTTP routes listen on `127.0.0.1` only and do not add CSRF/Origin checks (limited risk).
+6. HTTP routes are gated by the official `ctx.connection.requestRejection` (untrusted Host/Origin → 403, unauthenticated → 401), layered with an Origin allowlist + mandatory `application/json` (missing/non-JSON → 415), and a 1 MB `readJson` body cap.
 
 ## Develop & test
 
 ```sh
 node --check lib/index.js lib/service.js lib/orchestrator.js
-node --test    # 131/131 passing (logic + service integration + smoke)
+node --test    # 135/135 passing (logic + service integration + smoke)
 ```
 
 ## License

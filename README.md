@@ -225,7 +225,7 @@ start ──► spawn/send ──► 队员执行 ──► record（带 teamTas
 5. **generate 默认串行（共享 cwd、无文件锁）。** 确需并行时，各任务 `writeScopes` 必须互不重叠；并行队员数按执行手册上限（默认 8）。
 6. **`independentReview` 是 owner 校验，不是「插件自己跑一个指定模型的评委」。** 宿主没有同步「跑完并返回 verdict」的接口，插件不会自造 agent 运行时；如需异源评委，由 Lead 起独立子代理执行后回执。
 7. **真实端到端仍需重启验证。** 宿主 JS 只在启动时装载；install 返回 `restart-required`。
-8. **HTTP 仅监听本机 `127.0.0.1`，未加 CSRF/Origin 校验**（风险有限，未改）。`readJson` 有 1MB body 上限。
+8. **HTTP 路由已接官方 `ctx.connection.requestRejection`**（未信任 Host/Origin → 403，未认证 → 401），在其放行时再叠加 **Origin 白名单 + 强制 `application/json`**（缺失/非 JSON → 415），并有 `readJson` 1MB body 上限。
 
 ---
 
@@ -265,7 +265,7 @@ node --test
 
 当前状态（本机 Node 24、2026-11-13 实测）：
 
-- `node --test` → **131 / 131 通过**（逻辑 + 服务集成；冒烟脚本为独立 `*.mjs`）
+- `node --test` → **135 / 135 通过**（逻辑 + 服务集成；冒烟脚本为独立 `*.mjs`）
 - `npm pack --dry-run` → 发布包包含 `lib/` 下全部模块（含 `model-routes.js`）
 
 目录速览：
