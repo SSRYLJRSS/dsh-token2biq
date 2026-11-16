@@ -42,3 +42,19 @@ test('record 拒收时不再回传自相矛盾的 forceTeam', () => {
   assert.equal(rec.runForceTeam, true, 'runForceTeam 回传本次运行快照，二者不一致时用户能看出「改设置只影响新运行」');
   assert.ok(/快照/.test(rec.hint || ''), 'hint 必须说明「改设置只影响新运行」');
 });
+test('modelRouting 必须拆出 provider/model（只给合并引用等于强模型没配上）', async () => {
+  const svc = mk();
+  svc.settings.update({
+    strongModel: 'magpie-responses::gptmengluo/gpt-6-astra',
+    normalModel: 'magpie::wps-lingxi/deepseek-v4.1-flash',
+    forceTeam: 'auto', pipelineGate: 'off',
+  });
+  const agent = { id: 'agent_lead' };
+  const ctx = { agent, agentTeams: { isEnabled: () => true, createTask: async () => ({ id: 'tt_1' }) }, subagents: { rootOf: () => agent } };
+  const a = await svc.startWithAuto({ goal: 'p', mode: 'S4' }, ctx);
+  const plan = a.created.modelRouting.find((m) => m.stage === 'plan');
+  assert.equal(plan.provider, 'magpie-responses');
+  assert.equal(plan.model, 'gptmengluo/gpt-6-astra');
+  assert.equal(plan.ref, 'magpie-responses::gptmengluo/gpt-6-astra');
+  assert.ok(String(a.next).includes('magpie-responses + gptmengluo/gpt-6-astra'), 'next 必须直接给出可用的 provider/model');
+});
