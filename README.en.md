@@ -87,6 +87,21 @@ Settings live in `~/.dsh/token2biq/settings.json`. Hard-enforced on `record`: `f
 
 ---
 
+## Automatic host setup (no manual ticking)
+
+On load the plugin provisions two DSH host settings; they take effect after a **DSH restart**:
+
+| Written automatically | Location | Effect |
+| --- | --- | --- |
+| `- id: agent-team` → `defaultEnabled: true` | `~/.dsh/profiles/<profile>/cordis.patch.yml` | New root sessions start with official Agent Teams enabled (existing choices win) |
+| `- id: subagent-model-selection-settings` → `enabled: true` + current models pre-checked | same file | Subagents may use different models; available models are pre-filled from `settings.yaml` |
+
+Safety: never edits `~/.dsh/settings.yaml`; only appends these two entries; if an id already exists it is **left untouched** (reported as skipped); when no models are found it writes the Team entry only (no empty `allowedModels`); backs up to `cordis.patch.yml.bak-token2biq-<ts>`, writes atomically, verifies, and rolls back on failure; idempotent.
+
+Disable with `autoProvision: false`, re-run with `token2biq action=provision`, restore by copying the `.bak-token2biq-*` file back.
+
+---
+
 ## Docs & releases
 
 | Document | Contents |
@@ -115,6 +130,7 @@ Repository layout:
 lib/
 ├── index.js        Host entry: web routes + token2biq tool
 ├── host-integration.js Official Agent Teams adapter: live root session, isEnabled/setEnabled/rootOf only, real reasons
+├── autoprovision.js Post-install host setup: appends agent-team.defaultEnabled and the subagent model allowlist (backup/atomic/verify/rollback, idempotent)
 ├── service.js      Core service: tiers/plan/receipts/ledger/panel/dispatch
 ├── orchestrator.js Pure: tier PLANS / classify / playbook / roster
 ├── receipts.js     Pure: per-stage receipt validation

@@ -1,5 +1,15 @@
 # 变更日志
 
+## [0.5.2] - 2026-11-16
+
+### 安装后自动配置宿主（免手动勾选）
+
+- 新增 [autoprovision.js](lib/autoprovision.js)：插件加载时自动写 profile 层 `cordis.patch.yml`，把「启用官方 Agent Teams」与「子代理多模型选择 + 自动勾选当前模型」一步配好；重启 DSH 后生效。
+- 只追加 `agent-team`（`defaultEnabled: true`）与 `subagent-model-selection-settings`（`enabled: true` + `allowedModels`）两个条目；**不修改 `settings.yaml`**，同 id 已有用户配置一律跳过不覆盖。
+- 模型清单从 `settings.yaml` / profile patch 的 `llm-pi-ai.providers.*.models[].id` 扫描合并去重；扫描不到模型时只写团队条目，绝不写空 `allowedModels`。
+- 写前备份 `cordis.patch.yml.bak-token2biq-<ts>`，临时文件 + 原子替换，写后校验（原内容前缀不变 + 条目生效），失败自动回滚且不向宿主抛错；幂等重复启动零改动。
+- 设置新增 `autoProvision`（默认 true）与 `provisionProfile`（可空）；工具新增 `action=provision` 手动重跑；新增 9 条单测覆盖幂等/跳过/无模型/缺失目录/备份/写失败回滚/前缀不变。
+
 ## [0.5.1] - 2026-11-16
 
 ### 核心状态与阶段聚合

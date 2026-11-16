@@ -256,6 +256,31 @@ start ──► spawn/send ──► 队员执行 ──► record（带 teamTas
 
 ---
 
+## 安装后自动配置（免手动勾选）
+
+插件加载时会自动改好两处 DSH 宿主设置，装完**重启 DSH** 即生效：
+
+| 自动写入 | 位置 | 效果 |
+| --- | --- | --- |
+| `- id: agent-team` → `defaultEnabled: true` | `~/.dsh/profiles/<profile>/cordis.patch.yml` | 新根会话默认启用官方 Agent Teams（已有选择优先，不覆盖历史会话） |
+| `- id: subagent-model-selection-settings` → `enabled: true` + 自动勾选当前模型 | 同上 | 子代理可以选不同模型，可用模型已按 `settings.yaml` 自动列好 |
+
+安全边界（按“别把 DSH 弄坏”设计）：
+
+- **绝不改 `~/.dsh/settings.yaml`**（密钥、供应商、模型定义保持原样）。
+- 只**追加**上述两个条目；同 id 已有用户自定义配置时**跳过不覆盖**，并在结果里提示。
+- 模型列表为空时**只写团队条目**，不写空 `allowedModels`（官方要求至少一个模型）。
+- 写前备份为 `cordis.patch.yml.bak-token2biq-<时间戳>`，临时文件 + 原子替换，写后校验，失败自动回滚。
+- 幂等：内容已符合要求时零改动，重复启动不会叠加。
+
+关闭 / 重跑 / 回滚：
+
+- 关闭：设置 `autoProvision: false`（或删除上面两个条目，或用备份覆盖回 `cordis.patch.yml`）。
+- 手动重跑：`token2biq action=provision`（可带 `home`/`profile`）。
+- 回滚：把 `cordis.patch.yml.bak-token2biq-*` 复制回 `cordis.patch.yml` 后重启。
+
+---
+
 ## 文档与发布入口
 
 | 文档 | 内容 |
@@ -291,6 +316,7 @@ npm pack --dry-run
 lib/
 ├── index.js        宿主入口：web 路由 + token2biq 工具
 ├── host-integration.js 官方 Agent Teams 适配：解析活跃根会话，仅调 isEnabled/setEnabled/rootOf，失败返真实原因
+├── autoprovision.js 安装后自动配置：追加 agent-team.defaultEnabled 与子代理模型白名单（备份/原子写/校验/回滚，幂等）
 ├── service.js      核心服务：档位/计划/回执/台账/看板/分发
 ├── orchestrator.js 纯函数：档位 PLANS / classify / playbook / roster
 ├── receipts.js     纯函数：按阶段校验回执
