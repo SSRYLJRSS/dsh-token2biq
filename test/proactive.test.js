@@ -319,3 +319,168 @@ test('打磨：缺少 runId 时提示怎么拿，而不是「找不到运行 und
   assert.ok(out.error.includes('缺少 runId'), '必须明确说缺 runId');
   assert.ok(out.error.includes('run_'), '必须给出 run.id 的形态');
 });
+
+test('打磨：compactToolResult 对 state 形状不能削成空壳', async () => {
+  const { compactToolResult } = await import('../lib/index.js');
+  const tasks = Array.from({ length: 60 }, (_, i) => ({ id: 't' + i, stage: 'research', role: 'researcher', status: 'done', owner: 'w1', model: 'p/m', tokens: 100, summary: 'x'.repeat(80), files: ['a.js'], issues: [], diffSummary: 'y'.repeat(80) }));
+  const bigState = {
+    ok: true,
+    mode: 'Auto',
+    modes: [{ name: 'Auto', label: '自动' }, { name: 'S3', label: '完整加强' }],
+    config: { a: 1 },
+    settings: { forceTeam: 'auto' },
+    runs: Array.from({ length: 40 }, (_, i) => ({ id: 'run_' + i, mode: 'S3', status: 'done', goal: 'g'.repeat(60), spent: 900, updatedAt: 1 })),
+    liveUsage: { input: 1, output: 2 },
+    current: { id: 'run_39', mode: 'S3', status: 'running', goal: 'g', tasks, stages: [{ kind: 'research', label: '调研', status: 'running', tasks }], reviews: Array.from({ length: 40 }, (_, i) => ({ id: 'r' + i, verdict: 'PASS', issues: [] })) },
+    hint: 'h',
+  };
+  const out = compactToolResult(bigState);
+  const parsed = JSON.parse(out);
+  assert.equal(parsed.ok, true);
+  assert.ok(Array.isArray(parsed.runs) && parsed.runs.length > 0, 'runs 不能丢');
+  assert.ok(parsed.current && parsed.current.id === 'run_39', 'current 不能丢');
+  assert.ok(Array.isArray(parsed.current.tasks), 'current.tasks 不能丢');
+  assert.ok(out.length <= 12000, '必须压到限额内，实际 ' + out.length);
+});
+
+test('打磨：compactToolResult 对 start 形状仍保留 created/next', async () => {
+  const { compactToolResult } = await import('../lib/index.js');
+  const bigStart = {
+    ok: true,
+    run: { id: 'run_1', mode: 'S3', requestedMode: 'S3', status: 'running' },
+    plan: { mode: 'S3', maxAgents: 7, stages: ['research', 'plan'], costWeight: 7 },
+    created: { tasks: [{ id: 't1' }] },
+    modelRouting: [{ stage: 'research', model: 'p/m' }],
+    roster: [{ role: 'researcher', prompt: 'z'.repeat(20000) }],
+    playbook: { steps: 'q'.repeat(20000) },
+    next: '下一步',
+  };
+  const out = compactToolResult(bigStart);
+  const parsed = JSON.parse(out);
+  assert.equal(parsed.ok, true);
+  assert.ok(parsed.created, 'created 不能丢');
+  assert.ok(parsed.next, 'next 不能丢');
+  assert.ok(out.length <= 12000, '必须压到限额内，实际 ' + out.length);
+});
+
+test('打磨：事件流按序留痕（start -> stage -> verdict）', async () => {
+  const s = svc();
+  const team = { isEnabled: () => true, createTask: async () => ({ id: 't1', revision: 1, status: 'pending' }) };
+  const res = await s.startWithAuto({ goal: 'x', mode: 'S1' }, { agentTeams: team, agent: { id: 'lead-1' } });
+  const id = res.run.id;
+  s.store.setStageStatus(id, 'research', 'running');
+  s.store.setStageStatus(id, 'research', 'done');
+  s.store.setVerdict(id, { final: 'PASS', byJudge: 'judge', rationale: 'ok' });
+  const ev = s.store.getRun(id).events;
+  assert.ok(Array.isArray(ev) && ev.length >= 4, '至少 start + 2 stage + verdict，实际 ' + ev.length);
+  assert.equal(ev[0].kind, 'start', '首条必须是 start');
+  assert.equal(ev[ev.length - 1].kind, 'verdict', '末条必须是 verdict');
+  const stageEvs = ev.filter((e) => e.kind === 'stage').map((e) => e.status);
+  assert.deepEqual(stageEvs, ['running', 'done'], '阶段跃迁必须有序');
+  assert.ok(s.runView(s.store.getRun(id)).events.length > 0, 'runView 必须暴露 events');
+});
+
+test('打磨：运行数超上限时淘汰最旧的，且不淘汰正在跑的', async () => {
+  const s = svc();
+  const team = { isEnabled: () => true, createTask: async () => ({ id: 't1', revision: 1, status: 'pending' }) };
+  const ids = [];
+  for (let i = 0; i < 5; i++) {
+    const r = await s.startWithAuto({ goal: 'g' + i, mode: 'S1' }, { agentTeams: team, agent: { id: 'lead-1' } });
+    ids.push(r.run.id);
+  }
+  // 把最早的两个标记成已完成（可被淘汰），最新的保持 running（必须保留）
+  s.store.setStatus(ids[0], 'done');
+  s.store.setStatus(ids[1], 'done');
+  const dropped = s.store._prune(3);
+  assert.equal(dropped, 2, '应淘汰 2 个，实际 ' + dropped);
+  assert.equal(Object.keys(s.store.state.runs).length, 3);
+  assert.ok(s.store.getRun(ids[4]), '最新（running）必须保留');
+  assert.ok(!s.store.getRun(ids[0]), '最旧的已完成必须被淘汰');
+});
+
+test('打磨：事件条数超上限时截断最旧', async () => {
+  const s = svc();
+  const team = { isEnabled: () => true, createTask: async () => ({ id: 't1', revision: 1, status: 'pending' }) };
+  const res = await s.startWithAuto({ goal: 'x', mode: 'S1' }, { agentTeams: team, agent: { id: 'lead-1' } });
+  for (let i = 0; i < 700; i++) s.store._ev(res.run.id, 'tick', { i });
+  const ev = s.store.getRun(res.run.id).events;
+  assert.equal(ev.length, 500, '必须截断到 500 条，实际 ' + ev.length);
+  assert.equal(ev[ev.length - 1].i, 699, '保留最新的');
+});
+
+test('打磨：review 重试通过后阶段自愈为 done（不被历史 FAIL 粘死）', async () => {
+  const s = svc();
+  const team = { isEnabled: () => true, createTask: async () => ({ id: 't1', revision: 1, status: 'pending' }) };
+  const res = await s.startWithAuto({ goal: 'x', mode: 'S1' }, { agentTeams: team, agent: { id: 'lead-1' } });
+  const runId = res.run.id;
+  s.record({ runId, stage: 'review', status: 'done', verdict: 'FAIL', summary: '有问题', issues: ['a'] });
+  const afterFail = s.runView(s.store.getRun(runId)).stages.find((x) => x.kind === 'review');
+  assert.equal(afterFail.status, 'failed', 'FAIL 后阶段应为 failed');
+  s.record({ runId, stage: 'review', status: 'done', verdict: 'PASS', summary: '已修复' });
+  const afterPass = s.runView(s.store.getRun(runId)).stages.find((x) => x.kind === 'review');
+  assert.equal(afterPass.status, 'done', '重试通过后必须自愈为 done，实际 ' + afterPass.status);
+});
+
+test('打磨：已完成的运行不能再暂停/恢复（防绕过 finish 门禁）', async () => {
+  const s = svc();
+  const team = { isEnabled: () => true, createTask: async () => ({ id: 't1', revision: 1, status: 'pending' }) };
+  const res = await s.startWithAuto({ goal: 'x', mode: 'S1' }, { agentTeams: team, agent: { id: 'lead-1' } });
+  const runId = res.run.id;
+  s.store.setVerdict(runId, { final: 'PASS', byJudge: 'judge', rationale: 'ok' });
+  const paused = s.setPaused(runId, true);
+  assert.equal(paused.ok, false, '已完成运行必须拒绝暂停');
+  assert.match(paused.error, /已结束/);
+  assert.equal(s.store.getRun(runId).status, 'done', '状态不能被复活');
+  // 直接调 run-store 也不能复活
+  assert.equal(s.store.setPaused(runId, true, 'x'), null);
+  assert.equal(s.store.getRun(runId).status, 'done');
+});
+
+test('打磨：恢复暂停时还原暂停前状态，而不是硬编码 running', async () => {
+  const s = svc();
+  const team = { isEnabled: () => true, createTask: async () => ({ id: 't1', revision: 1, status: 'pending' }) };
+  const res = await s.startWithAuto({ goal: 'x', mode: 'S1' }, { agentTeams: team, agent: { id: 'lead-1' } });
+  const runId = res.run.id;
+  s.store.setStatus(runId, 'blocked');
+  s.setPaused(runId, true);
+  assert.equal(s.store.getRun(runId).status, 'paused');
+  s.setPaused(runId, false);
+  assert.equal(s.store.getRun(runId).status, 'blocked', '应还原为暂停前的 blocked，实际 ' + s.store.getRun(runId).status);
+});
+
+test('打磨：pause/delete 缺 runId 时给出可操作错误而非 undefined', async () => {
+  const s = svc();
+  assert.match(String(s.setPaused(undefined, true).error), /缺少 runId/);
+  assert.match(String(s.setPaused(undefined, false).error), /缺少 runId/);
+  assert.match(String(s.deleteRun(undefined).error), /缺少 runId/);
+});
+
+test('打磨：degraded 显式回传原因（无 agentTeams -> no-team）', async () => {
+  const s = svc();
+  const r = await s.startWithAuto({ goal: 'x', mode: 'S1' }, null);
+  assert.equal(r.degraded, 'no-team', '无宿主能力时必须回传 no-team，实际 ' + r.degraded);
+  const team = { isEnabled: () => true, createTask: async () => ({ id: 't1', revision: 1, status: 'pending' }) };
+  const ok = await s.startWithAuto({ goal: 'y', mode: 'S1' }, { agentTeams: team, agent: { id: 'lead-1' } });
+  assert.equal(ok.degraded, null, '建板成功时 degraded 必须是 null');
+  assert.equal(ok.orchestrated, true);
+});
+
+test('打磨：多实例写盘前合并，不互相抹掉运行', async () => {
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const { RunStore } = await import('../lib/run-store.js');
+  const file = path.join(os.tmpdir(), 'merge-state-' + Date.now() + '.json');
+  const plan = { mode: 'S1', maxAgents: 1, stages: ['research'], costWeight: 1 };
+  const a = new RunStore({ file });
+  const r1 = a.createRun({ goal: 'g1', plan, mode: 'S1' });
+  const b = new RunStore({ file }); // 第二个实例（模拟另一个 DSH 窗口）
+  const r2 = b.createRun({ goal: 'g2', plan, mode: 'S1' });
+  a.createRun({ goal: 'g3', plan, mode: 'S1' }); // a 再写：必须合并 b 的 run
+  const onDisk = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const ids = Object.keys(onDisk.runs);
+  assert.ok(ids.includes(r1.id), 'a 的 run 不能丢');
+  assert.ok(ids.includes(r2.id), 'b 的 run 不能被 a 覆盖掉，实际 ' + ids.length + ' 个');
+  assert.equal(ids.length, 3);
+  fs.unlinkSync(file);
+});

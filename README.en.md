@@ -84,7 +84,7 @@ Settings live in `~/.dsh/token2biq/settings.json`. Hard-enforced on `record`: `f
 
 ```sh
 node --check lib/index.js lib/service.js lib/orchestrator.js
-node --test    # 135/135 passing (logic + service integration + smoke)
+node --test    # 160 total: 159 passing + 1 skipped (logic + service integration + host contract + smoke)
 ```
 
 ## License

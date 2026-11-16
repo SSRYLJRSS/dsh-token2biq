@@ -1,7 +1,11 @@
 # Token 2b IQ 0.5.0 升级设计：与官方 Agent Teams 合并
 
-> 目标：DSH 0.2.2-rc.3 / 插件 0.4.3 → 0.5.0 · 状态：**P0 已实施并验证（140 测试全绿）**，P1–P3 待做（见 §12）
+> 目标：DSH 0.2.2-rc.3 / 插件 0.4.3 → 0.5.0 · 状态：**P0–P3 运行时已实施（160 测试：159 通过 + 1 跳过）**；§5/§6 为设计稿
 > 依据：官方包源码实读（app.asar 解包）+ 本机实测（run_mwirim7m_1）
+
+> **⚠️ 实施状态（以代码为准）**：§5/§6 描述的是**设计稿**，其中 `compile-workflow.js`、`clarify.js`、
+> `created.script`、`CompileError`、`agentTeams.getTask` 的 revision 校验、`settings.clarify`/`orchestrator`
+> 键**均未实施**。不要按 §6 的验收标准逐条核对代码——那些条目是待办，不是已完成。
 
 ## 0. 一页纸结论
 
@@ -315,4 +319,41 @@ STATE taskCount=1 stage=research diff=调研完成：3 个约束 est=false
 STATE paused=false ledger=yes orch=true caps=yes
 REPORT 建板=true 能力=true 模型路由=false
 MISSING={"ok":false,"error":"缺少 runId：请先 action=start，再传它返回的 run.id（形如 run_xxx）"}
+```
+
+## 14. 0.5.0 第三轮：数据一致性与契约校正
+
+两位新审查员（数据一致性 + 契约/文档）各出 6 条，**全部为真实缺陷**。本轮 12 条全部落地，测试 162/162。
+
+### 14.1 数据一致性（P1）
+
+| # | 位置 | 缺陷 | 修复 |
+|---|---|---|---|
+| 1 | `orchestrator.js` / `index.js` / README | 系统提示与工具描述仍写「插件会自动创建队员 / 真 spawn 队员」，但 0.5.0 契约是「插件不再建团，只出剧本 + 记账」→ 模型会等一批永远不会出现的队员 | 改为「建共享任务板、返回 `created.briefing`，队员必须你用 subagent 起」 |
+| 2 | `run-store.flush` | 写盘失败被吞，`record`/`finish` 一律回 `ok:true`；tmp 残留 | 记录 `lastFlushError`；`record` 返回 `warnings`、`finish` 返回 `persistWarning`，并清理残留 tmp |
+| 3 | `run-store.flush` | 整快照覆盖写，两个 DSH 窗口互相抹掉对方的 run | 写前 `_mergeExternal()`：按 `id`/`updatedAt` 合并磁盘上更新的运行 |
+| 4 | `setPaused` | 已完成的运行可被 pause→resume 复活，绕过 record/finish 门禁，二次 finish 静默覆盖原裁决 | `done` 状态直接拒绝暂停/恢复；恢复时还原 `statusBeforePause` 而非硬编码 `running` |
+| 5 | `settings._save` | 写盘失败静默回退，`forceTeam`/`pipelineGate`/`allowModels` 门禁静默翻转 | 记录 `lastSaveError`，`action=state` 回传 `settingsPersisted`/`settingsSaveError` |
+| 6 | `effStageStatus` + record 聚合 | 阶段「任一 FAIL 永久粘死」，重试通过后看板仍显示 failed，与任务回执自相矛盾 | 改为按「最后一次失败之后是否全通过」派生，重试通过即自愈 |
+
+### 14.2 契约与文档（P2）
+
+| # | 缺陷 | 修复 |
+|---|---|---|
+| 7 | `setPaused`/`deleteRun` 缺 `runId` 守卫，吐「找不到运行 undefined」 | 补守卫，统一「缺少 runId：…」 |
+| 8 | `start` 返回体没有 `degraded`，调用方只能正则匹配中文文案 | 显式回传 `degraded: null \| 'no-team' \| 'no-orchestration'` |
+| 9 | README 写 135/135、UPGRADE 写 151，实测 160 | 统一为实测值 |
+| 10 | README 称「token 硬预算熔断已移除」，但 `settings.tokenBudget` 仍存在且真的熔断 | 改述为成本闸门，并补进配置表 |
+| 11 | UPGRADE §5/§6 把 `compile-workflow.js`/`clarify.js`/`created.script` 等**未实施**设计稿描述成已交付 | 文档头加「实施状态」警示，明确不要按 §6 验收 |
+| 12 | `compactToolResult` 按 `start` 形状写死却套在所有 action 上 → `action=state` 被削成 `{ok:true,_truncated}` | 改为形状无关的三级瘦身（先丢可再取的大块，再留骨架） |
+
+### 14.3 新增能力
+
+- **事件流**：`run.events` 追加式审计流（start / stage / verdict / status / pause / resume / escalate），上限 500 条；`runView.events` 与 `action=export` 的「事件流」段可见。
+- **容量上限**：`MAX_RUNS=200`（优先淘汰已结束且最久的，活跃运行最后淘汰）+ `MAX_EVENTS=500`，快照不再无限膨胀。
+
+### 14.4 验证
+
+```
+ℹ tests 162   ℹ pass 162   ℹ fail 0
 ```

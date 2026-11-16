@@ -163,7 +163,7 @@ start ──► spawn/send ──► 队员执行 ──► record（带 teamTas
 | **S4 完整加强** | 8 | 同 S3，但评审/裁决/红队按角色池**多候选并行多审**（任一 FAIL 即该阶段 FAIL） | 3 | ×16 |
 | **Auto 自动** | — | 关键词先筛 → 拿不准用低思考模型复核 → 失败回退关键词 | — | — |
 
-> 早期版本有「token 硬预算熔断」，**已移除**——硬限会直接掐断任务反而导致失败。现在用「档位 = 参与角色数」来粗粒度控制开销。
+> 0.5.0 起提供**成本闸门**（`settings.tokenBudget`，0=不限）：消耗到 80% 时面板与 `action=state` 提示收敛，到 100% 时熔断——不再新建任务，由 Lead 用现有回执收口。它只拦「新建」，不会掐断已完成的工作。日常仍用「档位 = 参与角色数」做粗粒度控制。
 
 ### 四个零件
 
@@ -199,6 +199,7 @@ start ──► spawn/send ──► 队员执行 ──► record（带 teamTas
 | `allowModels` | 模型白名单 | ✅ **硬校验**：`record` 上报 `model` 且不在白名单 → 拒收（不上报则不判）。通过 `settings.json` 或 `action=settings` 配置（面板未内置白名单入口） |
 | `requireDifferentVendor` | 评审/裁判不得与生成同厂商 | ✅ **硬校验**：`record` 上报同厂商 `model` → 拒收（不上报则不判） |
 | `independentReview` | 评审/裁判/红队必须由非执行者盲审 | ✅ **硬校验**：`owner` 不能是本次 generate 执行者（自评拒收） |
+| `tokenBudget` | 每运行 token 预算（`0`=不限） | ✅ **硬生效**：≥80% 提示收敛，≥100% 熔断——不再新建任务，由 Lead 用现有回执收口 |
 | `pipelineGate`（`off`/`strict`） | 严格流水线硬门禁 | ✅ **硬校验**：见下 |
 | `rolePools` / `roleModels`（按角色指定模型） | 每阶段用哪个模型 | ⚠️ **建议**：写进执行手册，插件不强制切换 |
 | `reviewModels` / `maxReviewers` / `parallelReviews` | 评审池轮转、多审数量 | ⚠️ **建议**：写进手册，由 Lead 用 subagent 落地 |
@@ -265,7 +266,7 @@ node --test
 
 当前状态（本机 Node 24、2026-11-13 实测）：
 
-- `node --test` → **135 / 135 通过**（逻辑 + 服务集成；冒烟脚本为独立 `*.mjs`）
+- `node --test` → **160 项：159 通过 + 1 跳过**（逻辑 + 服务集成 + 宿主契约；冒烟脚本为独立 `*.mjs`）
 - `npm pack --dry-run` → 发布包包含 `lib/` 下全部模块（含 `model-routes.js`）
 
 目录速览：
