@@ -42,6 +42,7 @@ test('record 拒收时不再回传自相矛盾的 forceTeam', () => {
   assert.equal(rec.runForceTeam, true, 'runForceTeam 回传本次运行快照，二者不一致时用户能看出「改设置只影响新运行」');
   assert.ok(/快照/.test(rec.hint || ''), 'hint 必须说明「改设置只影响新运行」');
 });
+
 test('modelRouting 必须拆出 provider/model（只给合并引用等于强模型没配上）', async () => {
   const svc = mk();
   svc.settings.update({
@@ -58,4 +59,18 @@ test('modelRouting 必须拆出 provider/model（只给合并引用等于强模�
   assert.equal(plan.modelName, 'gptmengluo/gpt-6-astra', '拆好的模型名给 subagent 直接用');
   assert.equal(plan.model, 'magpie-responses::gptmengluo/gpt-6-astra', 'model 保持合并引用（既有契约）');
   assert.ok(String(a.next).includes('magpie-responses + gptmengluo/gpt-6-astra'), 'next 必须直接给出可用的 provider/model');
+});
+
+test('强模型配在 plan/judge、档位却是 S1 时必须告警（否则静默 0 命中）', () => {
+  const svc = mk();
+  svc.settings.update({
+    strongModel: 'magpie-responses::gptmengluo/gpt-6-astra',
+    normalModel: 'magpie::wps-lingxi/deepseek-v4.1-flash',
+    forceTeam: 'auto', pipelineGate: 'off',
+    rolePools: { plan: ['magpie-responses::gptmengluo/gpt-6-astra'], judge: ['magpie-responses::gptmengluo/gpt-6-astra'] },
+  });
+  const s1 = svc.start({ goal: 'x', mode: 'S1' });
+  assert.ok(/0 命中/.test(s1.modelRoutingWarning || ''), 'S1 不含 plan/judge，必须告警');
+  const s2 = svc.start({ goal: 'x', mode: 'S2' });
+  assert.equal(s2.modelRoutingWarning, null, 'S2 含 plan，不该告警');
 });
