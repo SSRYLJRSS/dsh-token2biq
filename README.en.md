@@ -18,7 +18,7 @@
 
 ## What it solves
 
-DSH Agent Teams already answers "can multiple agents collaborate?" (`spawn_teammate`, `team_task_create`, `send_message`, `wait_agent`). In practice multi-agent work still gets stuck on three other things:
+DSH Agent Teams already answers "can multiple agents collaborate?" (`subagent`, `team_task_create`, `send_message`, `wait_agent`). In practice multi-agent work still gets stuck on three other things:
 
 | Without an orchestration layer | What Token 2b IQ adds |
 | --- | --- |
@@ -74,7 +74,7 @@ Settings live in `~/.dsh/token2biq/settings.json`. Hard-enforced on `record`: `f
 ## Design limits (please read before installing)
 
 1. A tier is **a strong prompt + hard receipt gates, not a kernel-level interceptor** of every tool call.
-2. Model-routed stages must be executed by the Lead with `subagent`; `spawn_teammate` cannot carry an LLM provider/model.
+2. Model-routed stages must be executed by the Lead with `subagent`; `subagent` can carry an explicit LLM provider/model.
 3. `pipelineGate` defaults to `off` (see the A/B note above).
 4. "Real token" is process-wide (host `llm/stream` usage carries no `runId`), so it can be higher than one run's true cost.
 5. `generate` is serial by default (shared cwd, no file lock); parallel tasks need disjoint `writeScopes`.

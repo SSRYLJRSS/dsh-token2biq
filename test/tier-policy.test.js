@@ -42,30 +42,28 @@ test('setSessionPref：档位变更会通知宿主重渲染提示段', () => {
   assert.equal(captured, 'sess-1=S3');
 });
 
+// 0.2.2-rc.3 契约：tryMembership / spawnTeammate / listMembers 均已删除，
+// 插件只用 isEnabled + createTask（+ getTask/updateTask）——这里只实现用到的部分。
 function makeFakeTeam() {
   let n = 0;
-  const calls = { createTask: [], spawn: [] };
+  const calls = { createTask: [] };
   return {
     calls,
-    tryMembership: () => ({ role: 'lead' }),
+    isEnabled: () => true,
     createTask: async (_a, req) => { calls.createTask.push(req); return { id: 'task-' + (++n), revision: 1, status: 'pending' }; },
-    spawnTeammate: async (_a, req) => {
-      if (!req || req.provider !== 'spawn') throw new Error('spawnTeammate 必须收到 provider=spawn，实际：' + (req && req.provider));
-      calls.spawn.push(req); return { member: { name: req.name, target: req.name, status: 'provisioning' } };
-    },
-    listMembers: () => [],
   };
 }
 
-test('autoSpawn：带 model 的阶段不 spawnTeammate（它无法指定模型），改由 Lead 用 subagent 执行', async () => {
+test('autoBoard：带 model 的阶段不进派活简报，改由 Lead 用 subagent 执行', async () => {
   const s = svc();
   s.updateSettings({ roleModels: { generate: 'magpie::workbuddy/glm-5.3-flash' } });
   const team = makeFakeTeam();
   const res = await s.startWithAuto({ goal: '给某模块加个功能，涉及多文件', mode: 'S2' }, { agentTeams: team, agent: { id: 'lead-1' } });
   assert.equal(res.orchestrated, true);
   assert.ok(Array.isArray(res.created.modelRouting) && res.created.modelRouting.some((m) => m.stage === 'generate'));
-  // generate 不 spawn：spawn 里的 name 不应包含 generate-worker
-  assert.ok(team.calls.spawn.every((r) => !/generate/.test(r.name)), 'generate 阶段不应被 spawnTeammate');
+  // generate 阶段不进简报：它由 Lead 用 subagent(provider/model) 直接执行
+  assert.ok(res.created.briefing.every((b) => b.stage !== 'generate'), 'generate 阶段不应进派活简报');
+  assert.ok(res.created.briefing.every((b) => b.delegation && b.delegation.prompt), '每条简报都要带可直接照抄的 delegation.prompt');
   // next 里明确告知要用 subagent 执行带模型阶段
   assert.match(res.next, /subagent/);
 });
@@ -105,9 +103,8 @@ test('autoSpawn: 超出 maxAgents 窗口的模型阶段也会被 modelRouting �
   const res = await s.startWithAuto({ goal: '架构级大改', mode: 'S3' }, { agentTeams: team, agent: { id: 'lead-1' } });
   assert.equal(res.orchestrated, true);
   assert.ok(res.created.modelRouting.some((m) => m.stage === 'regression'), '窗口外的 regression 必须进 modelRouting');
-  // 非模型阶段 6 个 → 应 spawn 6 人
-  assert.equal(res.created.members.length, 6);
-  assert.equal(team.calls.spawn.length, 6);
+  // 非模型阶段 6 个 → 派活简报 6 条
+  assert.equal(res.created.briefing.length, 6);
 });
 
 test('autoSpawn: 全阶段配模型 → members=0 且 next 不谎称已建队员（issue #2）', async () => {
@@ -116,8 +113,7 @@ test('autoSpawn: 全阶段配模型 → members=0 且 next 不谎称已建队员
   s.updateSettings({ roleModels: all });
   const team = makeFakeTeam();
   const res = await s.startWithAuto({ goal: '多文件任务', mode: 'S2' }, { agentTeams: team, agent: { id: 'lead-1' } });
-  assert.equal(res.created.members.length, 0);
-  assert.equal(team.calls.spawn.length, 0);
+  assert.equal(res.created.briefing.length, 0);
   assert.equal(res.created.modelRouting.length, 4);
   assert.match(res.next, /没有常驻队员/);
 });

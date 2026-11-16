@@ -23,7 +23,7 @@
 
 ## 它解决什么问题
 
-DSH 的 Agent Teams 已经解决了「**能不能多代理协作**」——`spawn_teammate` 建队员、`team_task_create` 建共享任务、`send_message` 派活、`wait_agent` 等结果。但从真实工作里看，多代理往往卡在另外三件事上：
+DSH 的 Agent Teams 已经解决了「**能不能多代理协作**」——`subagent` 建队员、`team_task_create` 建共享任务、`send_message` 派活、`wait_agent` 等结果。但从真实工作里看，多代理往往卡在另外三件事上：
 
 | 没有编排层时 | Token 2b IQ 提供 |
 | --- | --- |
@@ -52,7 +52,7 @@ Token 2b IQ **不是**另一套 agent 运行时。它和官方 Agent Teams 是�
 flowchart LR
   M[主模型 / Team Lead] -->|action=start| T[Token 2b IQ<br/>选档位·建计划·建任务板]
   T -->|roster / playbook| M
-  M -->|spawn_teammate / team_task_create| A[官方 Agent Teams<br/>队员 + 共享任务]
+  M -->|subagent / team_task_create| A[官方 Agent Teams<br/>队员 + 共享任务]
   A -->|执行| M
   M -->|action=record 回执| T
   T -->|台账 + 看板| U[面板 / 报告]
@@ -219,7 +219,7 @@ start ──► spawn/send ──► 队员执行 ──► record（带 teamTas
 这一节是刻意写下来的，避免你带着错误预期安装它：
 
 1. **档位是「强提示 + 记账硬门禁」，不是内核级硬拦截。** 插件通过系统提示、执行手册和 `record` 校验来推动流程；它无法拦截 agent 的每一次工具调用。模型仍可能不按 roster 走，真正的执行一致性依赖官方 Agent Teams 的规范用法。
-2. **模型路由阶段必须由 Lead 用 `subagent` 执行。** `spawn_teammate` 只传委派 `provider`，**无法携带 LLM `provider/model`**。所以凡是配置了模型的阶段，playbook 会明确要求 Lead 用 `subagent(provider/model)` 执行，并在 `record` 带回同一个 `model`，否则白名单/跨厂商校验无从生效。
+2. **模型路由阶段必须由 Lead 用 `subagent` 执行。** `subagent` 可显式传 `provider/model`（`subagent_fork` 不支持模型选择）。所以凡是配置了模型的阶段，playbook 会明确要求 Lead 用 `subagent(provider/model)` 执行，并在 `record` 带回同一个 `model`，否则白名单/跨厂商校验无从生效。
 3. **`pipelineGate` 默认 `off`，这是有 A/B 依据的。** 3 个自包含任务（小/中/大）× 2 臂，两臂均 3/3 通过、独立盲审 3/3 PASS、0 返工——严格流水线在小任务上**不提升正确率、只增加开销**。其价值待「生成者会犯错」的硬任务再验证。
 4. **「真实 token」是全进程口径，不是按队员精确归属。** 宿主 `llm/stream` 的 usage 分片不带 `runId`，插件只能把运行活跃期间**同进程**的调用都归到当前运行；同期的其他对话也可能被算进来。数值偏高于预期时，通常就是这个原因。
 5. **generate 默认串行（共享 cwd、无文件锁）。** 确需并行时，各任务 `writeScopes` 必须互不重叠；并行队员数按执行手册上限（默认 8）。
@@ -232,7 +232,7 @@ start ──► spawn/send ──► 队员执行 ──► record（带 teamTas
 ## FAQ
 
 **Q：它会替代官方 Agent Teams 吗？**
-不会。它是策略层与账本，执行原语仍全部来自官方 Agent Teams（`spawn_teammate` / `team_task_*` / `send_message` / `wait_agent`）。两者是「经理」与「施工队」。
+不会。它是策略层与账本，执行原语仍全部来自官方 Agent Teams（`subagent` / `team_task_*` / `send_message` / `wait_agent`）。两者是「经理」与「施工队」。
 
 **Q：为什么装上之后面板是空的？**
 面板只显示**真正调用过 `token2biq action=start`** 的运行。没有运行就不会有记录——这不是 bug。

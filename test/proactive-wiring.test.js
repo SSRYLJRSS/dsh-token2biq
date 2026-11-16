@@ -24,7 +24,7 @@ function makeAgent(id, role) {
   };
 }
 
-function makeCtx(agentTeams, agents, onRegister) {
+function makeCtx(agentTeams, agents, onRegister, subagents) {
   const events = {};
   return {
     events,
@@ -35,30 +35,28 @@ function makeCtx(agentTeams, agents, onRegister) {
       const s = {};
       s.effect = (fn) => { const d = fn(); return typeof d === 'function' ? d : (() => {}); };
       if (names.includes('agentTeams')) { s.agentTeams = agentTeams; s.agents = agents; cb(s); }
+      else if (names.includes('subagents')) { s.subagents = subagents; cb(s); }
       else if (names.includes('tools')) { s.tools = { register: (def) => { onRegister(def); return () => {}; } }; cb(s); }
       // sessionController / webServer 在测试里跳过
     },
   };
 }
 
-test('apply 注入 Lead/队员提示段，且工具 start 会真建任务板+spawn（fake 宿主）', async () => {
-  const calls = { createTask: [], spawn: [] };
+test('apply 注入 Lead/队员提示段，且工具 start 会真建任务板+出简报（fake 宿主）', async () => {
+  const calls = { createTask: [] };
   let n = 0;
+  // 0.2.2-rc.3 契约：只用 isEnabled 判团队成员；Lead/队员判定交给 subagents.rootOf。
   const agentTeams = {
-    tryMembership: (a) => a && a.__m,
+    isEnabled: (a) => !!(a && a.__m),
     createTask: async (_a, req) => { calls.createTask.push(req); return { id: 'task-' + (++n), revision: 1, status: 'pending', subject: req.subject }; },
-    spawnTeammate: async (_a, req) => {
-      if (!req || req.provider !== 'spawn') throw new Error('spawnTeammate 必须收到 provider=spawn，实际：' + (req && req.provider));
-      calls.spawn.push(req); return { member: { name: req.name, target: req.name } };
-    },
-    listMembers: () => [],
   };
   const lead = makeAgent('lead-1', 'lead');
   const mate = makeAgent('mate-1', 'teammate');
   const agents = { list: () => [lead, mate] };
+  const subagents = { rootOf: (a) => (a && a.__m && a.__m.role === 'lead' ? a : lead) };
 
   let toolDef = null;
-  const ctx = makeCtx(agentTeams, agents, (d) => { toolDef = d; });
+  const ctx = makeCtx(agentTeams, agents, (d) => { toolDef = d; }, subagents);
   apply(ctx, { stateFile: tmp('state.json'), settingsFile: tmp('settings.json') });
 
   // ① 启动时对已有 Team 成员注入提示段（lead + teammate 各一段）
@@ -75,15 +73,15 @@ test('apply 注入 Lead/队员提示段，且工具 start 会真建任务板+spa
   for (const fn of ctx.events['agent/created'] || []) fn({ agent: late });
   assert.equal(late.sections.length, 1);
 
-  // ③ 工具 execute(start) 传 Lead exec.agent → 真去建任务板 + spawn（S1：3 任务 / 1 队员）
+  // ③ 工具 execute(start) 传 Lead exec.agent → 真去建任务板并出派活简报（S1：3 任务 / 1 条简报）
   assert.ok(toolDef && typeof toolDef.execute === 'function');
   const out = await toolDef.execute({ action: 'start', mode: 'S1', goal: '修一个跨文件 bug' }, { agent: lead, signal: undefined });
   const res = JSON.parse(out);
   assert.equal(res.ok, true);
   assert.equal(res.orchestrated, true);
   assert.equal(calls.createTask.length, res.roster.length);
-  assert.equal(calls.spawn.length, Math.min(res.roster.length, res.plan.maxAgents));
-  assert.equal(res.created.members.length, calls.spawn.length);
+  assert.equal(res.created.briefing.length, Math.min(res.roster.length, res.plan.maxAgents));
+  assert.ok(res.created.briefing.every((b) => b.delegation && typeof b.delegation.prompt === 'string'));
 });
 
 test('apply: 宿主无 agentTeams 时优雅降级（不抛、工具仍注册）', async () => {
@@ -99,4 +97,24 @@ test('apply: 宿主无 agentTeams 时优雅降级（不抛、工具仍注册）'
   };
   assert.doesNotThrow(() => apply(ctx, { stateFile: tmp('s2.json'), settingsFile: tmp('set2.json') }));
   assert.ok(toolDef);
+});
+
+test('apply: 队员身份调 start → 不建任务板（Lead 门禁生效）', async () => {
+  const calls = { createTask: [] };
+  let n = 0;
+  const agentTeams = {
+    isEnabled: () => true,
+    createTask: async (_a, req) => { calls.createTask.push(req); return { id: 'task-' + (++n), revision: 1, status: 'pending', subject: req.subject }; },
+  };
+  const lead = makeAgent('lead-2', 'lead');
+  const mate = makeAgent('mate-2', 'teammate');
+  const agents = { list: () => [lead, mate] };
+  const subagents = { rootOf: (a) => (a && a.__m && a.__m.role === 'lead' ? a : lead) };
+  let toolDef = null;
+  const ctx = makeCtx(agentTeams, agents, (d) => { toolDef = d; }, subagents);
+  apply(ctx, { stateFile: tmp('s3.json'), settingsFile: tmp('set3.json') });
+  const out = await toolDef.execute({ action: 'start', mode: 'S2', goal: 'x' }, { agent: mate });
+  const res = JSON.parse(out);
+  assert.equal(res.orchestrated, false, '队员不得建板');
+  assert.equal(calls.createTask.length, 0);
 });

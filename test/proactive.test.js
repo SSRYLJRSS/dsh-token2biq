@@ -41,27 +41,23 @@ test('buildPolicy: lead 指向 token2biq/start；teammate 指向 claim/回执', 
   assert.match(tp, /send_message|回执/);
 });
 
-function makeFakeTeam({ role = 'lead', failSpawn = false } = {}) {
+// 0.2.2-rc.3 契约：tryMembership / spawnTeammate / listMembers 已删除；
+// 插件只用 isEnabled(agent) 判团队成员、用 createTask 建共享任务——这里只实现用到的部分。
+function makeFakeTeam({ enabled = true, failCreate = false } = {}) {
   let n = 0;
-  const calls = { createTask: [], spawn: [] };
+  const calls = { createTask: [] };
   return {
     calls,
-    tryMembership: () => ({ role }),
+    isEnabled: () => enabled,
     createTask: async (_agent, req) => {
+      if (failCreate) throw new Error('create boom');
       calls.createTask.push(req);
       return { id: 'task-' + (++n), revision: 1, status: 'pending', subject: req.subject, blockedBy: req.blockedBy || [] };
     },
-    spawnTeammate: async (_agent, req) => {
-      if (!req || req.provider !== 'spawn') throw new Error('spawnTeammate 必须收到 provider=spawn，实际：' + (req && req.provider));
-      if (failSpawn) throw new Error('spawn boom');
-      calls.spawn.push(req);
-      return { member: { name: req.name, target: req.name, status: 'provisioning' } };
-    },
-    listMembers: () => [],
   };
 }
 
-test('startWithAuto: Lead 团队运行时 → 插件建满任务板并按 maxAgents spawn 队员', async () => {
+test('startWithAuto: Lead 团队运行时 → 插件建满任务板并产出 maxAgents 条派活简报', async () => {
   const s = svc();
   const team = makeFakeTeam();
   const res = await s.startWithAuto({ goal: '多文件重构整个模块 + 迁移', mode: 'S3' }, { agentTeams: team, agent: { id: 'lead-1' } });
@@ -69,24 +65,23 @@ test('startWithAuto: Lead 团队运行时 → 插件建满任务板并按 maxAge
   assert.ok(res.roster.length >= 5);
   // 每个阶段一个共享任务
   assert.equal(team.calls.createTask.length, res.roster.length);
-  // 常驻队员数 = min(阶段数, maxAgents)
-  const expectSpawn = Math.min(res.roster.length, res.plan.maxAgents);
-  assert.equal(team.calls.spawn.length, expectSpawn);
-  assert.equal(res.created.members.length, expectSpawn);
+  // 派活简报条数 = min(非模型阶段数, maxAgents)
+  const expectBrief = Math.min(res.roster.length, res.plan.maxAgents);
+  assert.equal(res.created.briefing.length, expectBrief);
   // 首个任务无 blockedBy，后续链式依赖前一任务 id
   assert.equal(team.calls.createTask[0].blockedBy, undefined);
   assert.deepEqual(team.calls.createTask[1].blockedBy, ['task-1']);
-  // 返回体含可执行的下一步 + 花名册
+  // 返回体含可执行的下一步 + 花名册 + 可直接照抄的简报
   assert.ok(Array.isArray(res.created.tasks));
-  assert.match(res.next, /created|队员|任务板/);
+  assert.ok(res.created.briefing.every((b) => b.delegation && typeof b.delegation.prompt === 'string' && b.delegation.prompt.length > 20));
+  assert.match(res.next, /subagent|任务板/);
 });
 
 test('startWithAuto: 非 Lead / 无团队 → 回退纯计划，不建任务也不 spawn', async () => {
   const s = svc();
-  const team = makeFakeTeam({ role: 'teammate' });
+  const team = makeFakeTeam({ enabled: false });
   const res = await s.startWithAuto({ goal: 'x', mode: 'S1' }, { agentTeams: team, agent: {} });
   assert.equal(res.orchestrated, false);
-  assert.equal(team.calls.spawn.length, 0);
   assert.equal(team.calls.createTask.length, 0);
   assert.ok(Array.isArray(res.roster));
   assert.ok(res.plan);
@@ -100,13 +95,22 @@ test('startWithAuto: 无 ctxInfo（如 HTTP 调用）→ 不主动建团，纯�
   assert.ok(res.roster.length >= 3);
 });
 
-test('startWithAuto: spawn 抛错不致命，记入 members.error 且 orchestrated 仍成立', async () => {
+test('startWithAuto: createTask 抛错不致命，记入 tasks[].error 且 orchestrated 仍成立', async () => {
   const s = svc();
-  const team = makeFakeTeam({ failSpawn: true });
+  const team = makeFakeTeam({ failCreate: true });
   const res = await s.startWithAuto({ goal: 'x', mode: 'S1' }, { agentTeams: team, agent: {} });
-  assert.equal(res.orchestrated, true); // autoSpawn 内部 catch，不向上抛
-  assert.ok(res.created.members.some((m) => m.error));
-  assert.equal(team.calls.createTask.length, res.roster.length); // 任务仍建好
+  assert.equal(res.orchestrated, true); // autoBoard 内部 catch，不向上抛
+  assert.ok(res.created.tasks.some((m) => m.error));
+  assert.equal(res.created.tasks.length, res.roster.length); // 每个阶段都留了行
+});
+
+test('startWithAuto: 团队协作关闭（isEnabled=false）→ 完全不动手，回退纯计划', async () => {
+  const s = svc();
+  const team = makeFakeTeam({ enabled: false });
+  const res = await s.startWithAuto({ goal: 'x', mode: 'S2' }, { agentTeams: team, agent: { id: 'lead-1' } });
+  assert.equal(res.orchestrated, false);
+  assert.equal(team.calls.createTask.length, 0);
+  assert.ok(res.plan && Array.isArray(res.roster));
 });
 
 test('buildRoster: independentReview 开启时 review/judge 标记 independent，generate 不标', () => {
@@ -145,63 +149,173 @@ test('independentReview 关闭时：执行者自评不拦（旧行为）', () =>
   assert.equal(same.ok, true);
 });
 
-function makeFakeTeamWithPrior(priorRows) {
+function makeFakeTeamLead() {
   let n = 0;
-  const calls = { createTask: [], spawn: [] };
+  const calls = { createTask: [] };
   return {
     calls,
-    tryMembership: () => ({ role: 'lead' }),
+    isEnabled: () => true,
     createTask: async (_a, req) => { calls.createTask.push(req); return { id: 'task-' + (++n), revision: 1, status: 'pending', subject: req.subject, blockedBy: req.blockedBy || [] }; },
-    listMembers: () => priorRows,
-    spawnTeammate: async (_a, req) => { calls.spawn.push(req); return { member: { name: req.name, target: req.name, status: 'provisioning' } }; },
   };
 }
 
-test('F8 autoSpawn 幂等：重复 start 复用同名 research 队员，不重复 spawn', async () => {
+test('F8 autoBoard 幂等：两次 start 各建一整套任务板，任务 id 不复用', async () => {
   const s = svc();
-  const team = makeFakeTeamWithPrior([{ name: 'research-researcher', role: 'teammate', status: 'inactive' }]);
-  const res = await s.startWithAuto({ goal: 'x', mode: 'S3' }, { agentTeams: team, agent: { id: 'lead-1' } });
-  assert.equal(res.orchestrated, true);
-  const rm = res.created.members.find((m) => m.stage === 'research');
-  assert.ok(rm, 'research 阶段应有 member 行');
-  assert.equal(rm.status, 'inactive');
-  assert.equal(rm.target, 'research-researcher');
-  assert.ok(!team.calls.spawn.some((r) => r.name === 'research-researcher'), '不应重复 spawn research-researcher');
-});
-
-test('F8 反例：listMembers 为空时照常 spawn research-researcher（provider=spawn）', async () => {
-  const s = svc();
-  const team = makeFakeTeamWithPrior([]);
-  const res = await s.startWithAuto({ goal: 'x', mode: 'S3' }, { agentTeams: team, agent: { id: 'lead-1' } });
-  assert.equal(res.orchestrated, true);
-  assert.ok(team.calls.spawn.some((r) => r.name === 'research-researcher' && r.provider === 'spawn'));
-  const rm = res.created.members.find((m) => m.stage === 'research');
-  assert.equal(rm.status, 'provisioning');
-});
-
-test('F8b listMembers 返回对象：members 数组可复用，非数组安全退化为 spawn', async () => {
-  const s = svc();
-  const mk = (lmValue) => {
-    let n = 0;
-    const calls = { createTask: [], spawn: [] };
-    return {
-      calls,
-      tryMembership: () => ({ role: 'lead' }),
-      createTask: async (_a, req) => { calls.createTask.push(req); return { id: 'task-' + (++n), revision: 1, status: 'pending', subject: req.subject, blockedBy: req.blockedBy || [] }; },
-      listMembers: () => lmValue,
-      spawnTeammate: async (_a, req) => { calls.spawn.push(req); return { member: { name: req.name, target: req.name, status: 'provisioning' } }; },
-    };
-  };
-  // ① 返回 { members: [...] } → 复用 research-researcher，不重复 spawn
-  const t1 = mk({ members: [{ name: 'research-researcher', role: 'teammate', status: 'inactive' }] });
-  const r1 = await s.startWithAuto({ goal: 'x', mode: 'S3' }, { agentTeams: t1, agent: { id: 'lead-1' } });
+  const team = makeFakeTeamLead();
+  const r1 = await s.startWithAuto({ goal: 'x', mode: 'S3' }, { agentTeams: team, agent: { id: 'lead-1' } });
+  const r2 = await s.startWithAuto({ goal: 'x', mode: 'S3' }, { agentTeams: team, agent: { id: 'lead-1' } });
   assert.equal(r1.orchestrated, true);
-  const rm1 = r1.created.members.find((m) => m.stage === 'research');
-  assert.equal(rm1.status, 'inactive');
-  assert.ok(!t1.calls.spawn.some((r) => r.name === 'research-researcher'));
-  // ② 返回 { members: 'oops' }（非数组）→ 安全退化 []，正常 spawn 且不抛
-  const t2 = mk({ members: 'oops' });
-  const r2 = await s.startWithAuto({ goal: 'x', mode: 'S3' }, { agentTeams: t2, agent: { id: 'lead-1' } });
   assert.equal(r2.orchestrated, true);
-  assert.ok(t2.calls.spawn.some((r) => r.name === 'research-researcher' && r.provider === 'spawn'));
+  // 两次各自建了一整套任务（去重交给宿主任务板）
+  assert.equal(team.calls.createTask.length, r1.roster.length + r2.roster.length);
+  // 每条简报都绑定自己的 taskId，且两次 start 的 id 不重叠
+  assert.ok(r1.created.briefing.every((b) => b.taskId));
+  const ids1 = r1.created.briefing.map((b) => b.taskId);
+  const ids2 = r2.created.briefing.map((b) => b.taskId);
+  assert.ok(ids1.every((id) => !ids2.includes(id)), '两次 start 的任务 id 不得复用');
+});
+
+test('F8b autoBoard: 未注入 subagents 时用 isEnabled 判 Lead（不抛、不误判）', async () => {
+  const s = svc();
+  const team = makeFakeTeamLead();
+  // 只传 agentTeams（宿主没提供 subagents）→ 退化为「是成员即 Lead」
+  const res = await s.startWithAuto({ goal: 'x', mode: 'S3' }, { agentTeams: team, agent: { id: 'lead-1' } });
+  assert.equal(res.orchestrated, true);
+  assert.ok(res.created.briefing.length > 0);
+});
+
+test('F8c autoBoard: subagents.rootOf 指向别人 → 判定为队员，完全不动手', async () => {
+  const s = svc();
+  const team = makeFakeTeamLead();
+  const subagents = { rootOf: () => ({ id: 'someone-else' }) };
+  const res = await s.startWithAuto({ goal: 'x', mode: 'S3' }, { agentTeams: team, agent: { id: 'member-1' }, subagents });
+  assert.equal(res.orchestrated, false);
+  assert.equal(team.calls.createTask.length, 0);
+});
+
+test('F8d autoBoard: subagents.rootOf 抛 UNAUTHORIZED → 安全回退纯计划', async () => {
+  const s = svc();
+  const team = makeFakeTeamLead();
+  const subagents = { rootOf: () => { throw new Error('UNAUTHORIZED'); } };
+  const res = await s.startWithAuto({ goal: 'x', mode: 'S2' }, { agentTeams: team, agent: { id: 'x' }, subagents });
+  assert.equal(res.orchestrated, false);
+  assert.equal(team.calls.createTask.length, 0);
+  assert.ok(res.plan && Array.isArray(res.roster));
+});
+
+test('P1 重试：createTask 瞬时错误重试后成功，并回传能力探测', async () => {
+  const s = svc();
+  let calls = 0;
+  const team = {
+    isEnabled: () => true,
+    createTask: async () => {
+      calls += 1;
+      if (calls <= 2) { const e = new Error('timeout'); e.code = 'ETIMEDOUT'; throw e; }
+      return { id: 'task-' + calls, revision: 1, status: 'pending' };
+    },
+  };
+  const res = await s.startWithAuto({ goal: 'x', mode: 'S1' }, { agentTeams: team, agent: { id: 'lead-1' } });
+  assert.equal(res.orchestrated, true);
+  assert.ok(res.created.tasks.every((t) => !t.error), '瞬时错误应被重试消化');
+  assert.ok(calls > res.roster.length, '应发生了重试');
+  assert.equal(res.created.capabilities.teamTasks, true);
+  assert.equal(res.created.capabilities.leadGate, false); // 没传 subagents
+});
+
+test('P1 重试：非瞬时错误不重试（createTask 非幂等，重复会留脏任务）', async () => {
+  const s = svc();
+  let calls = 0;
+  const team = {
+    isEnabled: () => true,
+    createTask: async () => { calls += 1; throw new Error('permission denied'); },
+  };
+  const res = await s.startWithAuto({ goal: 'x', mode: 'S1' }, { agentTeams: team, agent: { id: 'lead-1' } });
+  assert.equal(res.orchestrated, true);
+  assert.equal(calls, res.roster.length, '每个阶段只应尝试一次');
+  assert.ok(res.created.tasks.every((t) => t.error));
+});
+
+test('P2 交接：_handoff 汇总上游产物与未关闭问题', () => {
+  const s = svc();
+  const run = {
+    plan: { stages: ['research', 'design', 'generate'] },
+    tasks: [
+      { stage: 'research', files: ['a.js'], diffSummary: '调研', status: 'done', issues: [] },
+      { stage: 'design', files: [], diffSummary: '设计', verdict: 'PASS', issues: ['缺边界用例'] },
+      { stage: 'generate', files: ['b.js'], diffSummary: '不该出现' },
+    ],
+  };
+  const h = s._handoff(run, 'generate');
+  assert.deepEqual(h.items.map((i) => i.stage), ['research', 'design']);
+  assert.ok(h.text.includes('research') && h.text.includes('design'));
+  assert.deepEqual(h.openIssues, ['缺边界用例']);
+  assert.ok(!h.text.includes('不该出现'), '下游阶段不得泄漏到上游交接里');
+});
+
+test('P2 交接：首个阶段没有上游时给出明确说明而非空串', () => {
+  const s = svc();
+  const h = s._handoff({ plan: { stages: ['research', 'generate'] }, tasks: [] }, 'research');
+  assert.deepEqual(h.items, []);
+  assert.match(h.text, /上游尚未产出/);
+});
+
+test('打磨：_fillGoal 把 <目标>/<子任务> 换成实际目标摘要', () => {
+  const s = svc();
+  assert.equal(s._fillGoal('调研：<目标>的现状', '把登录模块拆成独立包'), '调研：把登录模块拆成独立包的现状');
+  assert.equal(s._fillGoal('实现：<子任务>', '目标X'), '实现：目标X');
+  assert.equal(s._fillGoal('无占位', '目标'), '无占位');
+  assert.ok(s._fillGoal('<目标>', 'A'.repeat(200)).endsWith('…'), '超长目标应截断');
+  assert.equal(s._fillGoal('<目标>', ''), '<目标>', '空目标保持原样，不吞模板');
+});
+
+test('P3 成本闸门：面板可见 ok/soft/hard 三档', async () => {
+  const s = svc();
+  s.settings.update({ tokenBudget: 1000 });
+  const team = { isEnabled: () => true, createTask: async () => ({ id: 't1', revision: 1, status: 'pending' }) };
+  const res = await s.startWithAuto({ goal: 'x', mode: 'S1' }, { agentTeams: team, agent: { id: 'lead-1' } });
+  const runId = res.run.id;
+  assert.equal(s.runView(s.store.getRun(runId)).budgetGate.level, 'ok');
+  s.store.getRun(runId).ledger.totalIn = 850;
+  assert.equal(s.runView(s.store.getRun(runId)).budgetGate.level, 'soft');
+  s.store.getRun(runId).ledger.totalIn = 1000;
+  assert.equal(s.runView(s.store.getRun(runId)).budgetGate.level, 'hard');
+  assert.equal(s.runView(s.store.getRun(runId)).budgetGate.percent, 100);
+});
+
+test('P3 成本闸门：未设预算时 budgetGate 为 null（向后兼容）', async () => {
+  const s = svc();
+  const team = { isEnabled: () => true, createTask: async () => ({ id: 't1', revision: 1, status: 'pending' }) };
+  const res = await s.startWithAuto({ goal: 'x', mode: 'S1' }, { agentTeams: team, agent: { id: 'lead-1' } });
+  assert.equal(s.runView(s.store.getRun(res.run.id)).budgetGate, null);
+});
+
+test('打磨：runView 暴露 tasks（action=state 不再永远 0 个任务）', async () => {
+  const s = svc();
+  const team = { isEnabled: () => true, createTask: async () => ({ id: 't1', revision: 1, status: 'pending' }) };
+  const res = await s.startWithAuto({ goal: 'x', mode: 'S1' }, { agentTeams: team, agent: { id: 'lead-1' } });
+  s.store.addTask(res.run.id, { stage: 'research', role: 'researcher', status: 'done', receipt: { diffSummary: '调研结论' }, tokensIn: 1, tokensOut: 2 });
+  const view = s.runView(s.store.getRun(res.run.id));
+  assert.equal(view.tasks.length, 1, 'runView 必须暴露 tasks');
+  assert.equal(view.tasks[0].stage, 'research', '出参回显 stage');
+  assert.equal(view.tasks[0].diffSummary, '调研结论', '出参回显 diffSummary');
+});
+
+test('打磨：autoBoard 失败时给出可操作原因，而不是伪装成「没有常驻队员」', async () => {
+  const s = svc();
+  // 宿主缺 createTask → 必须说明版本不匹配
+  const res = await s.startWithAuto({ goal: 'x', mode: 'S1' }, { agentTeams: { isEnabled: () => true }, agent: { id: 'lead-1' } });
+  assert.equal(res.orchestrated, false);
+  assert.ok(res.orchestrationError && res.orchestrationError.includes('agentTeams.createTask'), '必须说明缺哪个 API');
+  assert.ok(res.next.includes('未建任务板'), 'next 必须说明回退原因');
+  assert.ok(!res.next.includes('本次没有常驻队员'), '不能把未知伪装成正常态');
+});
+
+test('打磨：缺少 runId 时提示怎么拿，而不是「找不到运行 undefined」', async () => {
+  const s = svc();
+  const r = s.handleTool ? null : null;
+  // 直接走 record 分支
+  const out = await s.record({ stage: 'research' });
+  assert.equal(out.ok, false);
+  assert.ok(out.error.includes('缺少 runId'), '必须明确说缺 runId');
+  assert.ok(out.error.includes('run_'), '必须给出 run.id 的形态');
 });
