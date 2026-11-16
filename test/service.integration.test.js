@@ -238,9 +238,9 @@ test('S4 并行多审阶段状态聚合：任一 FAIL → failed，全 PASS → 
     const svc = new Token2bIQService({ stateFile: null, settingsFile: path.join(dir, 's.json') });
     svc.updateSettings({ forceTeam: 'off', rolePools: { review: ['a::A', 'b::B'] } });
     const runId = svc.start({ goal: 'x', mode: 'S4' }).run.id;
-    assert.equal(svc.record({ runId, stage: 'review', role: 'reviewer', verdict: 'PASS', model: 'a::A', evidence: ['ok'] }).ok, true);
+    assert.equal(svc.record({ runId, stage: 'review', role: 'reviewer', owner: 'rev-a', verdict: 'PASS', model: 'a::A', evidence: ['ok'] }).ok, true);
     assert.equal(svc.state(runId).current.stages.find((s) => s.kind === 'review').status, 'done');
-    assert.equal(svc.record({ runId, stage: 'review', role: 'reviewer', verdict: 'FAIL', model: 'b::B', issues: ['发现漏洞'] }).ok, true);
+    assert.equal(svc.record({ runId, stage: 'review', role: 'reviewer', owner: 'rev-b', verdict: 'FAIL', model: 'b::B', issues: ['发现漏洞'] }).ok, true);
     assert.equal(svc.state(runId).current.stages.find((s) => s.kind === 'review').status, 'failed');
 
     const dir2 = fs.mkdtempSync(path.join(os.tmpdir(), 't2biq-s4agg2-'));
@@ -248,8 +248,8 @@ test('S4 并行多审阶段状态聚合：任一 FAIL → failed，全 PASS → 
       const svc2 = new Token2bIQService({ stateFile: null, settingsFile: path.join(dir2, 's.json') });
       svc2.updateSettings({ forceTeam: 'off', rolePools: { review: ['a::A', 'b::B'] } });
       const rid2 = svc2.start({ goal: 'x', mode: 'S4' }).run.id;
-      svc2.record({ runId: rid2, stage: 'review', verdict: 'PASS', model: 'a::A', evidence: ['ok1'] });
-      svc2.record({ runId: rid2, stage: 'review', verdict: 'PASS', model: 'b::B', evidence: ['ok2'] });
+      svc2.record({ runId: rid2, stage: 'review', owner: 'rev-a', verdict: 'PASS', model: 'a::A', evidence: ['ok1'] });
+      svc2.record({ runId: rid2, stage: 'review', owner: 'rev-b', verdict: 'PASS', model: 'b::B', evidence: ['ok2'] });
       assert.equal(svc2.state(rid2).current.stages.find((s) => s.kind === 'review').status, 'done');
     } finally { fs.rmSync(dir2, { recursive: true, force: true }); }
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }

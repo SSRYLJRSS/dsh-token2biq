@@ -72,12 +72,27 @@ test('strict+多候选：generate 需 candidateId、judge 需 selectedCandidate�
   const g0 = svc.record({ runId, stage: 'generate', status: 'done', files: ['a.js'], diffSummary: 'impl' });
   assert.equal(g0.ok, false);
   assert.match(g0.error, /candidateId/);
-  const g1 = svc.record({ runId, stage: 'generate', status: 'done', files: ['a.js'], diffSummary: 'c1', candidateId: 'c1' });
+  // 候选 id 必须是 1..N 的整数：'c1' / 999 这类「看似有值」的 id 以前能混过去，
+  // 于是 judge 的择优可以指向一个根本不存在的候选。
+  const gc = svc.record({ runId, stage: 'generate', status: 'done', files: ['a.js'], diffSummary: 'c1', candidateId: 'c1' });
+  assert.equal(gc.ok, false);
+  assert.match(gc.error, /candidateId/);
+  const gx = svc.record({ runId, stage: 'generate', status: 'done', files: ['a.js'], diffSummary: 'c999', candidateId: 999 });
+  assert.equal(gx.ok, false);
+  assert.match(gx.error, /candidateId/);
+  const g1 = svc.record({ runId, stage: 'generate', status: 'done', files: ['a.js'], diffSummary: 'c1', candidateId: 1 });
   assert.equal(g1.ok, true);
+  // 同一候选不得重复记账（幂等以 teamTaskId+回执判定，这里没有 teamTaskId，按候选唯一性拦）。
+  const gdup = svc.record({ runId, stage: 'generate', status: 'done', files: ['a.js'], diffSummary: 'c1 again', candidateId: 1 });
+  assert.equal(gdup.ok, false);
+  assert.match(gdup.error, /已记录/);
   const j0 = svc.record({ runId, stage: 'judge', status: 'done', verdict: 'PASS' });
   assert.equal(j0.ok, false);
   assert.match(j0.error, /selectedCandidate/);
-  const j1 = svc.record({ runId, stage: 'judge', status: 'done', verdict: 'PASS', selectedCandidate: 'c1', rationale: 'c1 单测覆盖最高' });
+  const jbad = svc.record({ runId, stage: 'judge', status: 'done', verdict: 'PASS', selectedCandidate: 9 });
+  assert.equal(jbad.ok, false);
+  assert.match(jbad.error, /selectedCandidate/);
+  const j1 = svc.record({ runId, stage: 'judge', status: 'done', verdict: 'PASS', selectedCandidate: 1, rationale: '候选 1 单测覆盖最高' });
   assert.equal(j1.ok, true);
   svc.record({ runId, stage: 'verify', status: 'done', verdict: 'PASS', testsRun: 'npm test' });
   const f = svc.finish({ runId, verdict: 'PASS' });

@@ -18,12 +18,14 @@ const scope = {
   logger: { info() {} },
 };
 let streamTap = null;
+// 官方 connection 服务契约：requestRejection(req) 放行返回 undefined，拒绝时返回状态码。
+const fakeConnection = { requestRejection: () => undefined };
 const ctx = {
   inject(_d, cb) { cb(scope); },
   effect(fn) { return fn(); },
   on(name, fn) { if (name === 'llm/stream') streamTap = fn; },
   logger: { info() {} },
-  get() { return undefined; },
+  get(name) { return name === 'connection' ? fakeConnection : undefined; },
 };
 const tmpState = join(tmpdir(), 'token2biq-usage-' + process.pid + '.json');
 const host = await import(pathToFileURL(join(root, 'lib', 'index.js')).href);

@@ -4,7 +4,7 @@
 
 ### Trade measurable token spend for first-pass correctness
 
-**A multi-agent orchestration controller for DSH (DeepSeek Harness).** It picks a tier, spins up the team, collects receipts, keeps a token ledger and renders a run panel — while the actual work is still done by the official Agent Teams. In short: a **project manager + ledger + dashboard** on top of the executors.
+**A multi-agent orchestration controller for DSH (DeepSeek Harness).** It picks a tier, creates the shared task board, collects receipts, keeps a token ledger and renders a run panel — while the actual work is still done by the official Agent Teams. In short: a **project manager + ledger + dashboard** on top of the executors.
 
 [![GitHub](https://img.shields.io/badge/GitHub-SSRYLJRSS%2Fdsh--token2biq-181717?logo=github)](https://github.com/SSRYLJRSS/dsh-token2biq)
 [![License: MIT](https://img.shields.io/badge/License-MIT-3B82F6.svg)](LICENSE)
@@ -49,23 +49,25 @@ dsh plugin --profile web add github:SSRYLJRSS/dsh-token2biq
 dsh plugin --profile desktop add link:./dsh-token2biq
 ```
 
-> Replace `web` with your profile name (e.g. `desktop`). Host-side JS is loaded at startup — **a full DSH restart is required** after install/upgrade. Only `lib/client.js` (the panel) hot-reloads with a page refresh.
+> Replace `web` with your profile name (e.g. `desktop`). Host-side JS is loaded at startup — **a full DSH restart is required** after install/upgrade. Client changes require rebuilt host client artifacts and a page refresh. Development HMR additionally requires `pnpm run dev:web` running from the same checkout; saving source alone does not update the running GUI.
 
 ## Quick start
 
 1. Pick a tier from the **IQ** dropdown above the composer: `Off · Auto · S1 · S2 · S3 · S4`. This is a real session-level switch — `Off` makes the server reject `start`; a fixed tier is locked for the session and persisted.
-2. Let the model call `token2biq action=start { goal, mode? }`. As a Team Lead it creates the shared task board and teammates for you (`roster / created / modelRouting`).
+2. Let the model call `token2biq action=start { goal, mode? }`. As a Team Lead it creates the shared task board (`roster / created / modelRouting`). The Lead must still start teammates with official `subagent` and dispatch work with `send_message`; ready tasks do not start agents.
 3. Execute per roster, call `token2biq action=record` after each stage (with `teamTaskId` / `owner` / receipt), and `token2biq action=finish` at the end.
 
 ## Tiers
 
-| Tier | Max agents | Stages | Review rounds | Relative cost |
+| Tier | Max agents | Stages | Suggested review rounds | Relative cost |
 | --- | ---: | --- | ---: | ---: |
 | **S1** | 1 | generate → review → verify | 1 | ×2 |
 | **S2** | 3 | plan → generate → review → verify | 3 | ×5 |
 | **S3** | 6 | research → plan → generate → review → judge → redteam → regression | 3 | ×10 |
 | **S4** | 8 | same as S3, plus multi-candidate parallel review/judge/redteam | 3 | ×16 |
 | **Auto** | — | keyword screen → low-effort model check → fallback to keywords | — | — |
+
+`reviewRounds` is execution guidance, not automatic repetition. The task board and recorded receipts show the reviews actually completed.
 
 ## Configuration (what is enforced vs. advisory)
 
@@ -83,9 +85,12 @@ Settings live in `~/.dsh/token2biq/settings.json`. Hard-enforced on `record`: `f
 ## Develop & test
 
 ```sh
-node --check lib/index.js lib/service.js lib/orchestrator.js
-node --test    # 160 total: 159 passing + 1 skipped (logic + service integration + host contract + smoke)
+npm run check
+npm test
+npm pack --dry-run
 ```
+
+Use the isolated `npm test` entry point. See [verification](https://github.com/SSRYLJRSS/dsh-token2biq/blob/main/docs/VERIFICATION.md), [architecture](https://github.com/SSRYLJRSS/dsh-token2biq/blob/main/docs/ARCHITECTURE.md), and the [audit report](https://github.com/SSRYLJRSS/dsh-token2biq/blob/main/docs/AUDIT-2026-11-16.md) for measured results and remaining limits.
 
 ## License
 

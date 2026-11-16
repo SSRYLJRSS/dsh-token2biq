@@ -10,7 +10,7 @@ import { apply } from '../lib/index.js';
 
 function makeCtx(modelCatalog) {
   const captured = { handler: null, tool: null };
-  const services = { sessionController: modelCatalog ? { modelCatalog } : undefined };
+  const services = { connection: { requestRejection: () => undefined }, sessionController: modelCatalog ? { modelCatalog } : undefined };
   const ctx = {
     logger: { info() {} },
     on() {},
@@ -81,7 +81,7 @@ test('GET /token2biq/settings 返回设置；POST 可改并持久化', async () 
   const { ctx: ctx2 } = makeCtx();
   const captured2 = {};
   const ctxB = {
-    logger: { info() {} }, on() {}, get() {},
+    logger: { info() {} }, on() {}, get(name) { return name === 'connection' ? { requestRejection: () => undefined } : undefined; },
     inject(_d, cb) { cb({ effect: (fn) => fn(), get() {}, webServer: { register(r) { captured2.handler = r.handler; return () => {}; } }, tools: { register(d) { captured2.tool = d; return () => {}; } } }); },
   };
   apply(ctxB, { stateFile: null, settingsFile });

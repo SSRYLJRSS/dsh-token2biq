@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Token 2b IQ",
-    "description": "One model + multi-agent parallelism + multi-round cross-review + real tool verification: trade measurable token spend for first-pass correctness."
+    "description": "Multi-agent orchestration with per-role models, cross-review and tool verification. Uses official Agent Teams; enablement and model authorization remain explicit."
   }
 }

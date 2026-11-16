@@ -22,11 +22,13 @@ const fakeScope = {
   tools: { register(def) { globalThis.__tool = def; return () => {}; } },
   logger: { info() {} },
 };
+// 官方 connection 服务契约：requestRejection(req) 放行返回 undefined，拒绝时返回状态码。
+const fakeConnection = { requestRejection: () => undefined };
 const fakeCtx = {
   inject(_services, cb) { cb(fakeScope); },
   effect(fn) { return fn(); },
   logger: { info() {} },
-  get() { return undefined; },
+  get(name) { return name === 'connection' ? fakeConnection : undefined; },
 };
 const tmpState = join(tmpdir(), 'token2biq-smoke-' + process.pid + '.json');
 const host = await import(pathToFileURL(join(root, 'lib', 'index.js')).href);

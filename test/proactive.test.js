@@ -95,12 +95,17 @@ test('startWithAuto: 无 ctxInfo（如 HTTP 调用）→ 不主动建团，纯�
   assert.ok(res.roster.length >= 3);
 });
 
-test('startWithAuto: createTask 抛错不致命，记入 tasks[].error 且 orchestrated 仍成立', async () => {
+test('startWithAuto: 全部 createTask 失败必须降级（不得报 orchestrated 成功）', async () => {
+  // 旧行为：单个 createTask 抛错被内部 catch，全部失败也照样 orchestrated=true，
+  // 于是 forceTeam 保持强制、record 又因缺 teamTaskId 被门禁拒 —— 直接死锁。
   const s = svc();
   const team = makeFakeTeam({ failCreate: true });
   const res = await s.startWithAuto({ goal: 'x', mode: 'S1' }, { agentTeams: team, agent: {} });
-  assert.equal(res.orchestrated, true); // autoBoard 内部 catch，不向上抛
-  assert.ok(res.created.tasks.some((m) => m.error));
+  assert.equal(res.orchestrated, false);
+  assert.equal(res.degraded, 'no-orchestration');
+  assert.match(res.next, /未建任务板/);
+  // 建档明细仍要可见：哪几个阶段失败、错在哪
+  assert.ok(res.created.tasks.every((m) => m.error));
   assert.equal(res.created.tasks.length, res.roster.length); // 每个阶段都留了行
 });
 
@@ -230,7 +235,9 @@ test('P1 重试：非瞬时错误不重试（createTask 非幂等，重复会留
     createTask: async () => { calls += 1; throw new Error('permission denied'); },
   };
   const res = await s.startWithAuto({ goal: 'x', mode: 'S1' }, { agentTeams: team, agent: { id: 'lead-1' } });
-  assert.equal(res.orchestrated, true);
+  // 全部失败 → 降级（不再假装 orchestrated 成功），但「每个阶段只试一次」的契约不变。
+  assert.equal(res.orchestrated, false);
+  assert.equal(res.degraded, 'no-orchestration');
   assert.equal(calls, res.roster.length, '每个阶段只应尝试一次');
   assert.ok(res.created.tasks.every((t) => t.error));
 });
@@ -419,6 +426,10 @@ test('打磨：review 重试通过后阶段自愈为 done（不被历史 FAIL �
   s.record({ runId, stage: 'review', status: 'done', verdict: 'PASS', summary: '已修复' });
   const afterPass = s.runView(s.store.getRun(runId)).stages.find((x) => x.kind === 'review');
   assert.equal(afterPass.status, 'done', '重试通过后必须自愈为 done，实际 ' + afterPass.status);
+  // 反向证明：状态是从「最新回执」派生的，不是一次性置位。再来一次 FAIL 必须重新变 failed。
+  s.record({ runId, stage: 'review', status: 'done', verdict: 'FAIL', summary: '回归了', issues: ['b'] });
+  const afterFail2 = s.runView(s.store.getRun(runId)).stages.find((x) => x.kind === 'review');
+  assert.equal(afterFail2.status, 'failed', '新 FAIL 必须立刻反映，实际 ' + afterFail2.status);
 });
 
 test('打磨：已完成的运行不能再暂停/恢复（防绕过 finish 门禁）', async () => {

@@ -33,7 +33,7 @@ function makeCtx(requestRejection) {
   return { ctx, captured, connection };
 }
 
-// 降级变体：完全不提供 connection（scope 无 connection、get 返回 undefined），用于验证 Origin 白名单兜底。
+// 不提供 connection 时必须 fail closed，不猜测用户的官方信任策略。
 function makeCtxNoConn() {
   const captured = {};
   const scope = {
@@ -137,9 +137,16 @@ test('content-type application/jsonx → 415（精确匹配，非前缀子串）
   assert.equal(r.statusCode, 415);
 });
 
-test('降级：无 connection 时 Origin 白名单兜底，GET /export + 跨站 Origin → 403 且不抛', async () => {
+test('无 connection 时 GET /export → 503 且不抛', async () => {
   const { ctx, captured } = makeCtxNoConn();
   apply(ctx, { stateFile: null, settingsFile: settingsFile() });
   const r = await callRoute(captured.handler, { url: '/token2biq/export', headers: { origin: 'http://evil.com' } });
-  assert.equal(r.statusCode, 403);
+  assert.equal(r.statusCode, 503);
+});
+
+test('official trusted remote origin remains accepted by plugin', async () => {
+  const { ctx, captured } = makeCtx(() => undefined);
+  apply(ctx, { stateFile: null, settingsFile: settingsFile() });
+  const r = await callRoute(captured.handler, { method: 'POST', url: '/token2biq/settings', body: { forceTeam: 'off' }, headers: { origin: 'https://trusted.example', 'content-type': 'application/json' } });
+  assert.equal(r.statusCode, 200);
 });

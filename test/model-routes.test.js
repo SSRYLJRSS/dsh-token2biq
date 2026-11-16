@@ -23,22 +23,10 @@ test('collectModelRoutes: 汇总 rolePools/roleModels/目录，解析去重、�
   assert.equal(new Set(keys).size, keys.length); // 无重复
 });
 
-test('applySubagentModelPolicy: 正常 append / 无 session / 空 routes / append 抛错', () => {
-  let captured = null;
-  const sess = { append: (t, d) => { captured = { t, d }; } };
-  const routes = [{ provider: 'magpie', model: 'a' }, { provider: 'magpie', model: 'b' }];
-  const ok = applySubagentModelPolicy(sess, routes);
-  assert.equal(ok.ok, true);
-  assert.equal(ok.count, 2);
-  assert.equal(captured.t, 'subagent/model-selection-policy');
-  assert.deepEqual(captured.d.allowedModels, routes);
-
-  assert.deepEqual(applySubagentModelPolicy(null, routes), { ok: false, reason: 'no-session' });
-  assert.deepEqual(applySubagentModelPolicy({}, routes), { ok: false, reason: 'no-session' });
-  assert.deepEqual(applySubagentModelPolicy(sess, []), { ok: false, reason: 'no-routes' });
-
-  const boom = { append: () => { throw new Error('nope'); } };
-  const r = applySubagentModelPolicy(boom, routes);
-  assert.equal(r.ok, false);
-  assert.equal(r.reason, 'nope');
+test('legacy policy helper cannot mutate official authorization', () => {
+  let writes = 0;
+  const result = applySubagentModelPolicy({ append() { writes += 1; } }, [{ provider: 'p', model: 'm' }]);
+  assert.equal(writes, 0);
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'official-policy-owned');
 });

@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Token 2b IQ",
-    "description": "同一个模型 + 多代理并发 + 多轮互审 + 真实工具验证，用可度量的 token 增量换取一次通过率。"
+    "description": "按角色选模型、多代理并发、多轮互审与工具验证。基于官方 Agent Teams，团队启用与模型授权均由用户明确控制。"
   }
 }

@@ -88,7 +88,7 @@ dsh plugin --profile desktop add link:./dsh-token2biq
 ### ⚠️ 生效方式（重要）
 
 - **宿主侧 `lib/index.js` / `service.js` / `orchestrator.js` 等只在启动时加载**，改动后**必须完整重启 DSH**（`no-hmr`）。
-- 仅改 `lib/client.js`（浏览器面板）可刷新页面即时生效。
+- 浏览器代码需要宿主重新构建客户端产物后刷新；只有同一 checkout 的 `pnpm run dev:web` 监听器运行时才支持开发热更新。不能只凭源文件已保存判断当前界面已更新。
 - 安装后在侧边栏出现「Token 2b IQ」入口，点击打开面板。
 
 ---
@@ -107,7 +107,7 @@ dsh plugin --profile desktop add link:./dsh-token2biq
 
 ### 2) 让模型调用 `token2biq action=start`
 
-模型在对话里驱动编排。如果调用方是 **Team Lead**，插件会**直接建好共享任务板 + 队员**（返回 `roster / created / modelRouting`），你只需监督执行：
+模型在对话里驱动编排。如果调用方是 **Team Lead**，插件创建官方共享任务板，并返回 `roster / created.briefing / modelRouting`。Lead 仍需调用官方 `subagent` 启动队员，再用 `send_message` 派活；任务变为 ready 不会自动启动队员。
 
 ```jsonc
 // 模型调用（示意）
@@ -118,8 +118,8 @@ dsh plugin --profile desktop add link:./dsh-token2biq
 
 - `plan`：`maxAgents / stages / reviewRounds / costWeight`
 - `playbook`：每阶段角色、并行方式、`writeScopes`、团队规则
-- `roster`：每个阶段一个常驻队员（`<kind>-<role>`）
-- `created`：已完成的任务板与队员（Team Lead 身份下）
+- `roster`：阶段角色与建议队员名，不代表队员已经启动
+- `created`：已创建的共享任务、派活说明及模型路由；失败或降级情况单独返回
 
 ### 3) 按 roster 执行 → 每阶段 `record` → 全部完成 `finish`
 
@@ -155,7 +155,7 @@ start ──► spawn/send ──► 队员执行 ──► record（带 teamTas
 
 ### 4 档位（这是控制 token 消耗的粗粒度手段，不设硬预算）
 
-| 档位 | 参与代理上限 | 阶段流程 | 互审轮数 | 相对成本权重 |
+| 档位 | 参与代理上限 | 阶段流程 | 建议互审轮数 | 相对成本权重 |
 | --- | ---: | --- | ---: | ---: |
 | **S1 轻量** | 1 | generate → review → verify | 1 | ×2 |
 | **S2 标准** | 3 | plan → generate → review → verify | 3 | ×5 |
@@ -164,6 +164,8 @@ start ──► spawn/send ──► 队员执行 ──► record（带 teamTas
 | **Auto 自动** | — | 关键词先筛 → 拿不准用低思考模型复核 → 失败回退关键词 | — | — |
 
 > 0.5.0 起提供**成本闸门**（`settings.tokenBudget`，0=不限）：消耗到 80% 时面板与 `action=state` 提示收敛，到 100% 时熔断——不再新建任务，由 Lead 用现有回执收口。它只拦「新建」，不会掐断已完成的工作。日常仍用「档位 = 参与角色数」做粗粒度控制。
+
+`reviewRounds` 是执行手册的建议轮数，不是自动追加评审任务的保证；实际完成的评审以任务板和回执为准。
 
 ### 四个零件
 
@@ -178,8 +180,7 @@ start ──► spawn/send ──► 队员执行 ──► record（带 teamTas
 
 ## 面板
 
-> 📸 截图占位：`docs/assets/panel-runs.png`（运行记录）、`docs/assets/panel-overview.png`（概览统计）、`docs/assets/panel-settings.png`（设置）。
-> README 只收真实截图，不接受概念图/伪造渲染。
+界面验证范围与当前限制见 [验证说明](https://github.com/SSRYLJRSS/dsh-token2biq/blob/main/docs/VERIFICATION.md)。
 
 - **运行记录**：每条一眼看到档位、这个档位额外做了什么、结论、token、时间；点开看阶段流程。
 - **概览统计（4 卡）**：运行数 / **真实 token（宿主 `llm/stream` 实时实测）** / **回执上报（含估算）** / 一次通过率；下方一行实时明细：输入 / 输出 / 缓存读 / 请求数。
@@ -257,17 +258,17 @@ start ──► spawn/send ──► 队员执行 ──► record（带 teamTas
 ```sh
 cd dsh-token2biq
 
-# 语法检查
-node --check lib/index.js lib/service.js lib/orchestrator.js lib/receipts.js lib/run-store.js lib/report.js lib/settings.js lib/paths.js lib/model-routes.js
+# 逐文件语法检查
+npm run check
 
-# 纯逻辑单测 + 服务集成测试（内存 store，不依赖宿主）
-node --test
+# 自动隔离用户状态的逻辑、服务和宿主契约测试
+npm test
+
+# 检查发布包内容
+npm pack --dry-run
 ```
 
-当前状态（本机 Node 24、2026-11-13 实测）：
-
-- `node --test` → **160 项：159 通过 + 1 跳过**（逻辑 + 服务集成 + 宿主契约；冒烟脚本为独立 `*.mjs`）
-- `npm pack --dry-run` → 发布包包含 `lib/` 下全部模块（含 `model-routes.js`）
+测试结果和执行环境见 [验证说明](https://github.com/SSRYLJRSS/dsh-token2biq/blob/main/docs/VERIFICATION.md)；代码结构见 [架构说明](https://github.com/SSRYLJRSS/dsh-token2biq/blob/main/docs/ARCHITECTURE.md)，本轮审查见 [审查报告](https://github.com/SSRYLJRSS/dsh-token2biq/blob/main/docs/AUDIT-2026-11-16.md)。请使用 `npm test` 的隔离入口，避免手工执行历史冒烟脚本写入真实用户配置。
 
 目录速览：
 

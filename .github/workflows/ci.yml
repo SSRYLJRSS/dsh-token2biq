@@ -1,0 +1,49 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: node ${{ matrix.node }} · ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: ['20', '22', '24']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 本包零运行时依赖（无 dependencies），故不设 cache / npm ci；
+      # 一旦引入依赖，这里要改成 `npm ci` 并提交 package-lock.json。
+      - name: Setup Node ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Versions
+        run: node --version && npm --version
+
+      - name: Syntax check（逐文件 node --check，避免多文件只报首项）
+        run: npm run check
+
+      - name: Unit + integration（每个测试进程独立临时 DSH_HOME）
+        run: npm test
+
+      - name: Smoke scripts（smoke-*.mjs + render-smoke.mjs，同样隔离）
+        run: npm run test:smoke
+
+      - name: Pack payload（lib 齐全 / 无 test·docs·scripts·tgz 泄漏）
+        run: npm run pack:check

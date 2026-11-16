@@ -63,9 +63,9 @@ test('apply 注入 Lead/队员提示段，且工具 start 会真建任务板+出
   assert.equal(lead.sections.length, 1);
   assert.equal(lead.sections[0].name, 'token2biq:policy');
   assert.equal(lead.sections[0].order, 600);
-  assert.match(lead.sections[0].text, /token2biq/);
+  assert.match(lead.sections[0].text({}), /token2biq/);
   assert.equal(mate.sections.length, 1);
-  assert.match(mate.sections[0].text, /claim|任务/);
+  assert.match(mate.sections[0].text({}), /claim|任务/);
 
   // ② 之后新建的 Team 代理也会被注入；同一代理重复事件不重复注入
   const late = makeAgent('late-1', 'lead');

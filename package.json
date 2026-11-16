@@ -1,9 +1,18 @@
 {
   "name": "dsh-token2biq",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Token 2b IQ — a multi-agent orchestration controller for DeepSeek Harness: tiers, receipts, token ledger and run panel. Trades measurable token spend for first-pass correctness, on top of the official Agent Teams.",
   "type": "module",
   "main": "lib/index.js",
+  "scripts": {
+    "check": "node scripts/check.mjs",
+    "check:all": "node scripts/check.mjs --all",
+    "test": "node test/run.mjs",
+    "test:isolation": "node --test --require ./test/_isolation-preload.cjs test/isolation.test.js",
+    "test:smoke": "node test/run-smoke.mjs",
+    "pack:check": "node scripts/check-pack.mjs",
+    "ci": "npm run check && npm test && npm run pack:check"
+  },
   "exports": {
     ".": { "default": "./lib/index.js" },
     "./client": { "default": "./lib/client.js" },

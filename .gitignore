@@ -9,3 +9,10 @@ coverage/
 *.tmp
 .baseline-lib/
 *.baseline
+
+# 测试隔离产物（preload 用系统临时目录，正常不落仓库；防御性忽略）
+test/.tmp/
+*.corrupt-*
+
+# 本地审查产物（路径 harness、截图、临时分析），不提交
+analysis/

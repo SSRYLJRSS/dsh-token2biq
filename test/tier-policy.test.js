@@ -118,17 +118,24 @@ test('autoSpawn: 全阶段配模型 → members=0 且 next 不谎称已建队员
   assert.match(res.next, /没有常驻队员/);
 });
 
-test('autoSpawn: 被路由阶段不作为下游 blockedBy 硬门禁（issue #3）', async () => {
+test('autoSpawn: 被路由阶段是真实依赖（新契约：不跳过），下游依赖它的任务', async () => {
   const s = svc();
-  // S2 阶段 plan,generate,review,verify；给 generate 配模型 → generate 阶段无队员
+  // S2 阶段 plan,generate,review,verify；给 generate 配模型 → generate 由 Lead 用 subagent 亲自执行
   s.updateSettings({ roleModels: { generate: 'magpie::workbuddy/glm-5.3-flash' } });
   const team = makeFakeTeam();
-  await s.startWithAuto({ goal: '多文件任务', mode: 'S2' }, { agentTeams: team, agent: { id: 'lead-1' } });
-  // 任务按 roster 顺序创建：索引 0=plan(task-1)、1=generate(task-2,被路由)、2=review(task-3)、3=verify(task-4)
+  const res = await s.startWithAuto({ goal: '多文件任务', mode: 'S2' }, { agentTeams: team, agent: { id: 'lead-1' } });
+  // 任务按 roster 顺序创建：索引 0=plan(task-1)、1=generate(task-2,路由)、2=review(task-3)、3=verify(task-4)
   const createCalls = team.calls.createTask;
   assert.ok(createCalls.length >= 3);
-  // review（索引 2）应依赖 plan(task-1)，跳过被路由、无人 claim 的 generate(task-2)，否则永久 blocked
-  assert.deepEqual(createCalls[2].blockedBy, ['task-1']);
+  // 旧实现「跳过被路由阶段」→ review 依赖 plan(task-1)，generate 之后的整板几乎全 ready。
+  // 新契约：review 依赖 generate 的 task-2 —— 而 task-2 正是 modelRouting 里绑定的那条任务。
+  assert.deepEqual(createCalls[2].blockedBy, ['task-2']);
+  const view = s.runView(s.store.getRun(res.run.id));
+  const routed = view.modelRouting.find((m) => m.stage === 'generate');
+  assert.ok(routed && routed.taskId === 'task-2', '被路由阶段必须真的上板，否则依赖链指向空气');
+  // 依赖必须指向任务板上真实存在的任务：不能是「被跳过」留下的空位。
+  const ids = new Set((view.teamTasks || []).map((t) => t.taskId));
+  assert.ok(createCalls[2].blockedBy.every((id) => ids.has(id)), 'blockedBy 必须命中真实任务');
 });
 
 test('startWithAuto: 会话锁定 S3 时，传入 mode=Auto 不得覆盖（issue #6）', async () => {

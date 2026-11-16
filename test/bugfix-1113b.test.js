@@ -41,6 +41,7 @@ test('compactToolResult：小结果原样返回', () => {
 function makeCtx() {
   const captured = {};
   const fakeScope = {
+    connection: { requestRejection: req => req.headers.origin === 'http://evil.com' ? 403 : undefined },
     effect(fn) { return fn(); },
     webServer: { register(r) { captured.handler = r.handler; return () => {}; } },
     tools: { register(d) { captured.tool = d; return () => {}; } },
