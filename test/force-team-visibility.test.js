@@ -48,13 +48,14 @@ test('modelRouting 必须拆出 provider/model（只给合并引用等于强模�
     strongModel: 'magpie-responses::gptmengluo/gpt-6-astra',
     normalModel: 'magpie::wps-lingxi/deepseek-v4.1-flash',
     forceTeam: 'auto', pipelineGate: 'off',
+    rolePools: { plan: ['magpie-responses::gptmengluo/gpt-6-astra'] },
   });
   const agent = { id: 'agent_lead' };
   const ctx = { agent, agentTeams: { isEnabled: () => true, createTask: async () => ({ id: 'tt_1' }) }, subagents: { rootOf: () => agent } };
   const a = await svc.startWithAuto({ goal: 'p', mode: 'S4' }, ctx);
   const plan = a.created.modelRouting.find((m) => m.stage === 'plan');
   assert.equal(plan.provider, 'magpie-responses');
-  assert.equal(plan.model, 'gptmengluo/gpt-6-astra');
-  assert.equal(plan.ref, 'magpie-responses::gptmengluo/gpt-6-astra');
+  assert.equal(plan.modelName, 'gptmengluo/gpt-6-astra', '拆好的模型名给 subagent 直接用');
+  assert.equal(plan.model, 'magpie-responses::gptmengluo/gpt-6-astra', 'model 保持合并引用（既有契约）');
   assert.ok(String(a.next).includes('magpie-responses + gptmengluo/gpt-6-astra'), 'next 必须直接给出可用的 provider/model');
 });

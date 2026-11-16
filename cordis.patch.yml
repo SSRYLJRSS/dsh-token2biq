@@ -2,3 +2,24 @@
 - insert:
     - id: dsh-token2biq
       name: dsh-token2biq
+
+# ============================================================================
+# 强模型路由的前置条件（P0）
+# ----------------------------------------------------------------------------
+# subagent 工具的 provider / model / reasoning_effort 三个参数，只在
+# modelSelection 开启时才存在：
+#   dsh-tool-subagent/src/index.ts:85   modelSelection: z.boolean().default(false)
+#   dsh-tool-subagent/src/index.ts:164  const modelSelectionEnabled = config.modelSelection === true
+#   dsh-tool-subagent/src/index.ts:246  ...modelSelectionEnabled ? {provider, model, ...} : {}
+#
+# 不开这一项，插件的 modelRouting 再正确也传不下去：Lead 照提示传 provider/model
+# 会得到 "child model selection is disabled for this tool instance"，强模型静默失效。
+#
+# 整段重声明（而不是只写 modelSelection: true），这样无论 patch 层是「深合并」
+# 还是「整块替换」，provider / toolName 都不会丢。
+# ============================================================================
+- id: tool-subagent
+  config:
+    provider: spawn
+    toolName: subagent
+    modelSelection: true
