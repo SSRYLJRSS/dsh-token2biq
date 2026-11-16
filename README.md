@@ -8,6 +8,9 @@
 真正干活的仍然是官方 Agent Teams；插件只做「**项目经理 + 记账本 + 仪表盘**」。
 
 [![GitHub](https://img.shields.io/badge/GitHub-SSRYLJRSS%2Fdsh--token2biq-181717?logo=github)](https://github.com/SSRYLJRSS/dsh-token2biq)
+[![CI](https://github.com/SSRYLJRSS/dsh-token2biq/actions/workflows/ci.yml/badge.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/actions/workflows/ci.yml)
+[![Version](https://img.shields.io/badge/version-v0.5.1-3B82F6.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
+[![Releases](https://img.shields.io/github/v/release/SSRYLJRSS/dsh-token2biq?display_name=tag&color=3B82F6)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-3B82F6.svg)](LICENSE)
 [![DSH](https://img.shields.io/badge/DSH-%3E%3D0.2.0--rc.1%20%3C0.3.0-10B981.svg)](https://github.com/deepseek-ai/deepseek-harness)
 [![awesome · DSH plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
@@ -15,7 +18,7 @@
 
 **简体中文** · [English](README.en.md)
 
-[安装](#安装) · [快速开始](#快速开始) · [核心概念](#核心概念) · [配置项](#配置项哪些硬生效哪些只是建议) · [设计边界](#设计边界与诚实的限制) · [FAQ](#faq)
+[安装](#安装) · [快速开始](#快速开始) · [核心概念](#核心概念) · [配置项](#配置项哪些硬生效哪些只是建议) · [设计边界](#设计边界与诚实的限制) · [文档与发布入口](#文档与发布入口) · [FAQ](#faq)
 
 </div>
 
@@ -253,6 +256,18 @@ start ──► spawn/send ──► 队员执行 ──► record（带 teamTas
 
 ---
 
+## 文档与发布入口
+
+| 文档 | 内容 |
+| --- | --- |
+| [CHANGELOG.md](CHANGELOG.md) | 版本变更记录（当前 **0.5.1**） |
+| [架构说明](docs/ARCHITECTURE.md) | 执行模型、模块职责与维护边界 |
+| [验证指南](docs/VERIFICATION.md) | 测试入口、验证范围与实测结果 |
+| [审查台账](docs/AUDIT-2026-11-16.md) | 本轮审查与修复验收记录 |
+| [GitHub Releases](https://github.com/SSRYLJRSS/dsh-token2biq/releases) | 发布说明与版本分发（`v0.5.1`） |
+
+---
+
 ## 开发与测试
 
 ```sh
@@ -275,9 +290,11 @@ npm pack --dry-run
 ```
 lib/
 ├── index.js        宿主入口：web 路由 + token2biq 工具
+├── host-integration.js 官方 Agent Teams 适配：解析活跃根会话，仅调 isEnabled/setEnabled/rootOf，失败返真实原因
 ├── service.js      核心服务：档位/计划/回执/台账/看板/分发
 ├── orchestrator.js 纯函数：档位 PLANS / classify / playbook / roster
 ├── receipts.js     纯函数：按阶段校验回执
+├── stage-state.js  纯函数：按 slot 聚合阶段状态，teamTaskId 优先、owner 次之，任一 FAIL 即 FAIL，重试自愈
 ├── run-store.js    8 实体持久化（JSON 原子写；可纯内存）
 ├── report.js       纯函数：导出 Markdown 报告
 ├── settings.js     设置存储与规整

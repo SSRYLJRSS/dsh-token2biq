@@ -7,6 +7,9 @@
 **A multi-agent orchestration controller for DSH (DeepSeek Harness).** It picks a tier, creates the shared task board, collects receipts, keeps a token ledger and renders a run panel — while the actual work is still done by the official Agent Teams. In short: a **project manager + ledger + dashboard** on top of the executors.
 
 [![GitHub](https://img.shields.io/badge/GitHub-SSRYLJRSS%2Fdsh--token2biq-181717?logo=github)](https://github.com/SSRYLJRSS/dsh-token2biq)
+[![CI](https://github.com/SSRYLJRSS/dsh-token2biq/actions/workflows/ci.yml/badge.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/actions/workflows/ci.yml)
+[![Version](https://img.shields.io/badge/version-v0.5.1-3B82F6.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
+[![Releases](https://img.shields.io/github/v/release/SSRYLJRSS/dsh-token2biq?display_name=tag&color=3B82F6)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-3B82F6.svg)](LICENSE)
 [![DSH](https://img.shields.io/badge/DSH-%3E%3D0.2.0--rc.1%20%3C0.3.0-10B981.svg)](https://github.com/deepseek-ai/deepseek-harness)
 
@@ -82,6 +85,20 @@ Settings live in `~/.dsh/token2biq/settings.json`. Hard-enforced on `record`: `f
 5. `generate` is serial by default (shared cwd, no file lock); parallel tasks need disjoint `writeScopes`.
 6. HTTP routes are gated by the official `ctx.connection.requestRejection` (untrusted Host/Origin → 403, unauthenticated → 401), layered with an Origin allowlist + mandatory `application/json` (missing/non-JSON → 415), and a 1 MB `readJson` body cap.
 
+---
+
+## Docs & releases
+
+| Document | Contents |
+| --- | --- |
+| [CHANGELOG.md](CHANGELOG.md) | Release notes (currently **0.5.1**) |
+| [Architecture](docs/ARCHITECTURE.md) | Execution model, module responsibilities, maintenance boundaries |
+| [Verification](docs/VERIFICATION.md) | Test entry points, verified scope, measured results |
+| [Audit report](docs/AUDIT-2026-11-16.md) | Review and fix acceptance record |
+| [GitHub Releases](https://github.com/SSRYLJRSS/dsh-token2biq/releases) | Release notes and version distribution (`v0.5.1`) |
+
+---
+
 ## Develop & test
 
 ```sh
@@ -91,6 +108,26 @@ npm pack --dry-run
 ```
 
 Use the isolated `npm test` entry point. See [verification](https://github.com/SSRYLJRSS/dsh-token2biq/blob/main/docs/VERIFICATION.md), [architecture](https://github.com/SSRYLJRSS/dsh-token2biq/blob/main/docs/ARCHITECTURE.md), and the [audit report](https://github.com/SSRYLJRSS/dsh-token2biq/blob/main/docs/AUDIT-2026-11-16.md) for measured results and remaining limits.
+
+Repository layout:
+
+```
+lib/
+├── index.js        Host entry: web routes + token2biq tool
+├── host-integration.js Official Agent Teams adapter: live root session, isEnabled/setEnabled/rootOf only, real reasons
+├── service.js      Core service: tiers/plan/receipts/ledger/panel/dispatch
+├── orchestrator.js Pure: tier PLANS / classify / playbook / roster
+├── receipts.js     Pure: per-stage receipt validation
+├── stage-state.js  Pure: aggregate stage state by slot, teamTaskId then owner, any FAIL wins, retries self-heal
+├── run-store.js    8-entity persistence (atomic JSON writes; in-memory capable)
+├── report.js       Pure: Markdown report export
+├── settings.js     Settings storage and normalization
+├── model-routes.js Subagent model allow policy
+├── paths.js        State file paths
+└── client.js       Browser panel
+```
+
+---
 
 ## License
 
