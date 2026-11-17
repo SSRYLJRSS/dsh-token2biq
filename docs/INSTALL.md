@@ -1,6 +1,6 @@
 # 安装与升级指南
 
-本文覆盖四条安装路径、常见失败原因和修复命令。目标版本：**0.6.2**，DSH 兼容范围 **>=0.2.2-rc.3 <0.3.0-0**。
+本文覆盖四条安装路径、常见失败原因和修复命令。目标版本：**0.6.3**，DSH 兼容范围 **>=0.2.2-rc.3 <0.3.0-0**。
 
 ## 1. 推荐：Desktop 插件市场
 
@@ -24,14 +24,14 @@ dsh plugin --profile desktop add github:SSRYLJRSS/dsh-token2biq
 
 ```sh
 dsh plugin --profile desktop why dsh-token2biq
-# 输出应显示 dsh-token2biq 0.6.2 及其来源 GitHub
+# 输出应显示 dsh-token2biq 0.6.3 及其来源 GitHub
 ```
 
 ## 3. 预构建 tarball（可选）
 
 ```sh
 # 固定版本（可复现，推荐）
-dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/download/v0.6.2/dsh-token2biq-0.6.2.tgz
+dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/download/v0.6.3/dsh-token2biq-0.6.3.tgz
 
 # 或始终取最新 release
 dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/latest/download/dsh-token2biq.tgz
@@ -93,10 +93,16 @@ pnpm 11 对 git 依赖默认不执行 `prepare` 构建脚本。本包没有 buil
 
 ## 版本与兼容声明
 
-- 包版本：`0.6.2`
+- 包版本：`0.6.3`
 - `package.json` 顶层 `engines.dsh`：`>=0.2.2-rc.3 <0.3.0-0`
 - `package.json` 的 `dsh.compatibility.dsh`：同上
 - 市场与宿主优先读取 `engines.dsh`；如果缺失，会显示“无版本声明 / 兼容未知”
+
+## 兼容性与放宽前提
+
+- 当前只声明并验证 DSH `>=0.2.2-rc.3 <0.3.0-0`；上界 `0.3.0-0` 本轮**不放宽**（0.3 的插件 API 尚未验证，贸然放宽会把「未知兼容」包装成「支持」）。
+- 放宽上界的前提：在目标 0.3.x 宿主上跑通 `npm run check && npm test && npm run test:smoke`，且 `token2biq` 工具与共享任务板/子代理模型选择在真实会话中可用；之后再同步修改 `package.json` 的 `engines.dsh` 与 `dsh.compatibility.dsh`（两者必须一致）。
+- `npm run test:compat` 在未提供 `DSH_VERSION` 时直接 skip（退出 0）；提供后打印声明区间与宿主版本，供 CI 做兼容核验。
 
 ## 自动配置宿主（安装后首次加载）
 
@@ -106,6 +112,8 @@ pnpm 11 对 git 依赖默认不执行 `prepare` 构建脚本。本包没有 buil
 - `- id: subagent-model-selection-settings` → `config.enabled: true` + 从 `settings.yaml` 扫描到的 `allowedModels`
 
 安全边界：不改 `settings.yaml`；只追加；同 id 已有配置不覆盖；写前备份 `cordis.patch.yml.bak-token2biq-<时间戳>`；临时文件 + 原子替换 + 写后校验；失败回滚。首次加载写入后重启 DSH 生效；若宿主没有热重载，再重启一次。
+
+**活动 profile 定位**：显式 `profile` → 设置 `provisionProfile` → `DSH_PROFILE` → 安装路径 `profiles/<name>/node_modules` 反解 → 枚举 `profiles/*`（仅唯一命中）。多 profile 无可靠来源时不写文件，`token2biq action=provision` 返回 `ok:false` 与 `candidates`。最近一次结果（含失败原因）在 `action=state` 的 `provisionStatus` 可见。
 
 ## 回滚
 

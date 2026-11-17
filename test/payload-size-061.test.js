@@ -14,6 +14,7 @@ function fakeTeam() {
     calls,
     isEnabled: () => true,
     createTask: async (_a, req) => { calls.push(req); return { id: 'task-' + (++n), revision: 1, status: 'pending', subject: req.subject, blockedBy: req.blockedBy || [] }; },
+    getTask: async (id) => ({ id, revision: 1 }),
   };
 }
 // 阶段名从建板描述「… · 阶段 generate（…）」里解析，供定向失败用。
@@ -32,6 +33,7 @@ function fakeTeamFailOn(badStages) {
       if (bad.has(st)) throw new Error('createTask boom: ' + st);
       return { id: 'task-' + (++n), revision: 1, status: 'pending', subject: req.subject, blockedBy: req.blockedBy || [] };
     },
+    getTask: async (id) => ({ id, revision: 1 }),
   };
 }
 // 全部建档失败：制造 all-failed（回退纯计划）。
@@ -39,6 +41,7 @@ function fakeTeamAllFail() {
   return {
     isEnabled: () => true,
     createTask: async (_a, req) => { throw new Error('board down: ' + stageOf(req)); },
+    getTask: async (id) => ({ id, revision: 1 }),
   };
 }
 function svc(extra = {}) {

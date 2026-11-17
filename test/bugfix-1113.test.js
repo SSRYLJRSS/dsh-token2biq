@@ -44,7 +44,7 @@ test('strict：空数组 testsRun 不算验证证据（修复前 [] 因 truthy �
   const vEmpty = svc.record({ runId, stage: 'verify', status: 'done', verdict: 'PASS', testsRun: [] });
   assert.equal(vEmpty.ok, false);
   assert.match(vEmpty.error, /testsRun/);
-  const vOk = svc.record({ runId, stage: 'verify', status: 'done', verdict: 'PASS', testsRun: ['node --test'] });
+  const vOk = svc.record({ runId, stage: 'verify', status: 'done', verdict: 'PASS', testsRun: [{ cmd: 'node --test', ok: true }] });
   assert.equal(vOk.ok, true);
   const f = svc.finish({ runId, verdict: 'PASS' });
   assert.equal(f.ok, true);

@@ -18,6 +18,14 @@ test('package.json 版本与 DSH 兼容声明齐全', () => {
   assert.ok(fs.existsSync(path.join(root, 'cordis.patch.yml')));
 });
 
+test('兼容性：test:compat 脚本存在；engines.dsh 可解析且与 dsh.compatibility.dsh 一致', () => {
+  assert.equal(typeof pkg.scripts['test:compat'], 'string', 'package.json 需提供 npm run test:compat');
+  const range = pkg.engines && pkg.engines.dsh;
+  assert.equal(range, pkg.dsh && pkg.dsh.compatibility && pkg.dsh.compatibility.dsh);
+  // 必须是可解析的 ">=x <y" 区间（市场/宿主据此判兼容）。
+  assert.match(String(range), /^>=\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?\s+<\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?$/, 'engines.dsh 必须可解析：' + range);
+});
+
 test('发布 payload 只含运行所需文件，且主入口存在', () => {
   for (const entry of ['lib/', 'cordis.patch.yml', 'locale/', 'icon.svg', 'README.md', 'README.en.md']) {
     assert.ok(pkg.files.includes(entry), 'files 缺少 ' + entry);

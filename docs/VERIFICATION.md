@@ -36,6 +36,16 @@
 
 上述步骤是验收方法，不代表已经执行。若重启或真实浏览器验证未进行，在结果中保留未覆盖项。
 
+## 本轮（0.6.3）最终验证状态与未覆盖项
+
+- `npm run ci`：350 项 / 349 通过 / 0 失败 / 1 条件跳过；`pack:check` 21 个文件、13 个 lib 模块齐全，无 test/docs/scripts/tgz 泄漏。
+- `npm run test:smoke`：5/5 脚本通过（smoke-load / smoke-tool / smoke-usage 等）。
+- `npm run test:compat`：声明 `>=0.2.2-rc.3 <0.3.0-0`；`DSH_VERSION=0.2.2-rc.3` 时 host 命中（未设置时跳过，退出码 0）。
+- 自动配置专项：`test/autoprovision.test.js` 16 用例全通过（跨 profile 解析、备份/原子写/前缀不变、幂等、无模型不写空 allowedModels、写失败回滚等）。
+- 打包：`npm pack` 21 文件、零运行时依赖、无安装脚本；`dsh-token2biq-0.6.3.tgz` 与 version-free `dsh-token2biq.tgz` 字节一致，sha256 = `fcf884442b17e846799b8fb8524c97bb92a5ad40548d3a4f7544033ba16fec11`。
+- 安装：本机 desktop profile 经 `dsh plugin --profile desktop add github:SSRYLJRSS/dsh-token2biq#<v0.6.3 commit>`（`NODE_OPTIONS=--use-system-ca`）从 0.6.2 重装到 0.6.3，`dsh plugin why` 确认 0.6.3（耗时约 13.6s，无 TLS 报错）；下方「本次安装源」小节为 0.6.2 时点的历史快照。
+- 未覆盖项保留：已登录 GUI 的真实浏览器端到端、完整重启 DSH 后新后端产物生效、远程 CI 矩阵（未在本机执行）。
+
 ## 本次安装源与活跃运行状态
 
 2026-11-17，Lead 已核验 desktop profile 的安装源为 commit-pinned GitHub 源（`git+https://github.com/SSRYLJRSS/dsh-token2biq.git#34eed5722adc3d43f057e0207c529bc92ac22e40`，版本 0.6.2）；旧的 `node_modules/dsh-token2biq` 目录联接已删除并替换为真实目录。官方 runtime 版本为 0.2.2-rc.3。

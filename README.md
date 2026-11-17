@@ -9,7 +9,7 @@
 
 [![GitHub](https://img.shields.io/badge/GitHub-SSRYLJRSS%2Fdsh--token2biq-181717?logo=github)](https://github.com/SSRYLJRSS/dsh-token2biq)
 [![CI](https://github.com/SSRYLJRSS/dsh-token2biq/actions/workflows/ci.yml/badge.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-v0.6.2-3B82F6.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
+[![Version](https://img.shields.io/badge/version-v0.6.3-3B82F6.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
 [![Releases](https://img.shields.io/github/v/release/SSRYLJRSS/dsh-token2biq?display_name=tag&color=3B82F6)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-3B82F6.svg)](LICENSE)
 [![DSH](https://img.shields.io/badge/DSH-%3E%3D0.2.2--rc.3%20%3C0.3.0-10B981.svg)](https://github.com/deepseek-ai/deepseek-harness)
@@ -86,7 +86,7 @@ dsh plugin --profile desktop add github:SSRYLJRSS/dsh-token2biq
 
 ```sh
 # 固定版本（可复现）
-dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/download/v0.6.2/dsh-token2biq-0.6.2.tgz
+dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/download/v0.6.3/dsh-token2biq-0.6.3.tgz
 
 # 或始终取最新版
 dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/latest/download/dsh-token2biq.tgz
@@ -118,7 +118,7 @@ rm -f ~/.dsh/profiles/desktop/node_modules/dsh-token2biq
 
 ### 版本与兼容性
 
-- 包版本：`0.6.2`
+- 包版本：`0.6.3`
 - DSH 兼容范围：`>=0.2.2-rc.3 <0.3.0-0`，同时写在 `package.json` 的 `engines.dsh` 与 `dsh.compatibility.dsh`
 - 市场与宿主读取 `engines.dsh` 判定兼容；不会再显示“无版本声明 / 兼容未知”
 
@@ -281,7 +281,7 @@ start ──► spawn/send ──► 队员执行 ──► record（带 teamTas
 5. **generate 默认串行（共享 cwd、无文件锁）。** 确需并行时，各任务 `writeScopes` 必须互不重叠；并行队员数按执行手册上限（S4 最多 8 个代理）。
 6. **`independentReview` 是 owner 校验，不是「插件自己跑一个指定模型的评委」。** 宿主没有同步「跑完并返回 verdict」的接口，插件不会自造 agent 运行时；如需异源评委，由 Lead 起独立子代理执行后回执。
 7. **真实端到端仍需重启验证。** 宿主 JS 只在启动时装载；install 返回 `restart-required`。
-8. **HTTP 路由已接官方 `ctx.connection.requestRejection`**（未信任 Host/Origin → 403，未认证 → 401），在其放行时再叠加 **Origin 白名单 + 强制 `application/json`**（缺失/非 JSON → 415），并有 `readJson` 1MB body 上限。
+8. **HTTP 路由已接官方 `ctx.connection.requestRejection`**（未信任 Host/Origin → 403，未认证 → 401），请求体按 `application/json` 解析，并有 `readJson` 1MB body 上限；访问控制以宿主 `requestRejection` 为准（插件不额外维护 Origin 白名单）。
 
 ---
 
@@ -306,6 +306,14 @@ start ──► spawn/send ──► 队员执行 ──► record（带 teamTas
 多半是 `forceTeam`（S2/S3/S4 默认强制）要求 `record` 带 `teamTaskId`+`owner`。按提示补字段或调设置即可。
 
 ---
+
+## 安装与活动 profile 定位
+
+- **市场 TLS**：市场按 GitHub 源安装；若报 `UNABLE_TO_VERIFY_LEAF_SIGNATURE`，是本机 Node 不信任 GitHub 证书链——PowerShell 先 `$env:NODE_OPTIONS='--use-system-ca'` 再安装/启动。
+- **junction 清理**：`link:` 安装会在 profile 的 `node_modules/dsh-token2biq` 建目录联接；切回市场/云端安装前必须先删，否则 pnpm 报 `ERR_PNPM_EPERM ... rename` 卡住。
+- **活动 profile 定位（优先级）**：显式参数 `profile` → 设置 `provisionProfile` → 环境变量 `DSH_PROFILE` → 插件安装路径 `profiles/<name>/node_modules` 反解 → 枚举 `~/.dsh/profiles/*`（仅唯一命中）。多 profile 且无可靠来源时**不写文件**，`action=provision` 返回 `ok:false` 与 `candidates` 候选列表，绝不静默写 `desktop`。
+- **`provisionStatus`**：最近一次自动配置结果（`ok/changed/patchFile/profileTargeted/candidates/error`）在 `action=state` 可见；启动失败会 `console.warn` 并记录在此，不阻断 DSH 启动。
+- **`action=provision`**：手动重跑（幂等），返回 `profileTargeted / patchFile / candidates / added / merged / unchanged / skipped`。
 
 ## 安装后自动配置（免手动勾选）
 
@@ -338,13 +346,13 @@ start ──► spawn/send ──► 队员执行 ──► record（带 teamTas
 
 | 文档 | 内容 |
 | --- | --- |
-| [CHANGELOG.md](CHANGELOG.md) | 版本变更记录（当前 **0.6.2**） |
+| [CHANGELOG.md](CHANGELOG.md) | 版本变更记录（当前 **0.6.3**） |
 | [安装与升级指南](docs/INSTALL.md) | 市场/CLI/源码安装、junction 清理、版本声明与回滚 |
 | [0.6 优化说明](docs/OPTIMIZATION-0.6.md) | 0.6.0 的档位重排、思考强度与提示词瘦身 |
 | [架构说明](docs/ARCHITECTURE.md) | 执行模型、模块职责与维护边界 |
 | [验证指南](docs/VERIFICATION.md) | 测试入口、验证范围与实测结果 |
 | [审查台账](docs/AUDIT-2026-11-16.md) | 本轮审查与修复验收记录 |
-| [GitHub Releases](https://github.com/SSRYLJRSS/dsh-token2biq/releases) | 发布说明与版本分发（`v0.6.2`） |
+| [GitHub Releases](https://github.com/SSRYLJRSS/dsh-token2biq/releases) | 发布说明与版本分发（`v0.6.3`） |
 
 ---
 

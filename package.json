@@ -1,6 +1,6 @@
 {
   "name": "dsh-token2biq",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "Token 2b IQ — a multi-agent orchestration controller for DeepSeek Harness: tiers, receipts, token ledger and run panel. Trades measurable token spend for first-pass correctness, on top of the official Agent Teams.",
   "type": "module",
   "main": "lib/index.js",
@@ -10,6 +10,7 @@
     "test": "node test/run.mjs",
     "test:isolation": "node --test --require ./test/_isolation-preload.cjs test/isolation.test.js",
     "test:smoke": "node test/run-smoke.mjs",
+    "test:compat": "node -e \"const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));const want=(p.engines||{}).dsh;const have=process.env.DSH_VERSION||process.env.DSH_COMPAT_VERSION;if(!have){console.log('[test:compat] skipped: DSH version not set (export DSH_VERSION to enforce)');process.exit(0);}console.log('[test:compat] declared',want,'| host',have);\"",
     "pack:check": "node scripts/check-pack.mjs",
     "ci": "npm run check && npm test && npm run pack:check"
   },

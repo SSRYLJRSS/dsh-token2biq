@@ -41,3 +41,29 @@ test('_spawnPrompt ≤400 且含 taskId/revision/claim/回执约束；_stageDesc
   assert.ok(desc.includes('revision=5'));
   assert.ok(desc.includes('不要 send_message'));
 });
+
+// P1-4：最坏输入下四要素齐全且仍 ≤400；stageDescription 六段齐全且 ≤500。
+test('P1-4：spawnPrompt 最坏输入 ≤400 且 writeScopes/doneWhen/回执/阻塞停止四要素齐全', () => {
+  const svc = mk();
+  const longGoal = '目标'.repeat(200);
+  const run = { id: 'run_x', goal: longGoal, stages: [{ kind: 'generate' }] };
+  const r = {
+    stage: 'generate', role: 'worker',
+    doneWhen: '产出改动文件 + diffSummary + 完整测试结果 + 覆盖边界',
+    writeScopes: ['src/a/**', 'src/b/**', 'src/c/**', 'src/d/**', 'docs/**'],
+  };
+  const p = svc._spawnPrompt(run, r, 'task-' + 'x'.repeat(80), 1234567);
+  assert.ok(p.length <= 400, 'spawnPrompt 实际 ' + p.length);
+  assert.match(p, /写域 src\/a/, 'writeScopes 必须出现');
+  assert.match(p, /产出改动文件/, 'doneWhen 必须出现');
+  assert.match(p, /回执 \{stage,files,diffSummary,verdict,issues\}/, '回执 JSON 字段必须出现');
+  assert.match(p, /blocked\/failed 停止/, 'blocked/failed 停止条件必须出现');
+});
+
+test('P1-4：stageDescription 覆盖 任务/目标/写域/判据/流程/回执 且 ≤500', () => {
+  const svc = mk();
+  const run = { id: 'run_y', goal: '重构' };
+  const desc = svc._stageDescription(run, { stage: 'generate', role: 'worker', doneWhen: '产出改动', writeScopes: ['src/a/**'] }, 5);
+  assert.ok(desc.length <= 500);
+  for (const k of ['任务：', '目标：', '写域：', '判据：', '流程：', '回执：']) assert.ok(desc.includes(k), '缺少 ' + k);
+});

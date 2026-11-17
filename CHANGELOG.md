@@ -1,5 +1,17 @@
 # 变更日志
 
+## [0.6.3] - 2026-11-17
+
+### 严格门禁 + 跨 profile 自动配置 + 健壮性
+
+- 版本 `0.6.2` → `0.6.3`（patch；兼容范围保持不变 `dsh >=0.2.2-rc.3 <0.3.0-0`），无破坏性 API 变更。
+- **P0 活动 profile 判定与跨 profile 自动配置**：新增 `resolveProfileDetailed`，按「显式参数 > settings.provisionProfile > DSH_PROFILE > 模块安装路径反解（`/profiles/<name>/node_modules/`）> 枚举 profiles/*（排除 `.bak/.tmp/.old` 等备份目录，仅唯一命中）」确定活动 profile；多 profile 且无可靠来源时回传候选并拒绝静默写入（不再默认 `desktop` 写偏）。已有同 id 的 `subagent-model-selection-settings` 条目时用 `planModelMerge` 增量补齐缺失模型，只插入新行、保留用户键值。`applyProvision` 回传 `profileTargeted/profileSource/candidates/merged`，并由 `service.provisionStatus` 承接。
+- **P0 安装链路 TLS / junction**：README 与 INSTALL 补充 `NODE_OPTIONS=--use-system-ca`（GitHub 源 TLS 证书链）与 `node_modules/dsh-token2biq` junction 清理命令，覆盖 0.6.2 市场安装卡住根因。
+- **P1 strict judge / testsRun 门禁**：新增 `testsProven`——`testsRun` 任一项 `ok:false` 一票否决（即使回执自报 `testsPassed:true`）；否则要求 `testsRun` 非空且逐项 `ok:true`，杜绝「只报命令名未报结果」蒙混通过；配套 strict finish 验证必须位于最新 `generate` 之后。
+- **P1 提示词压缩**：精简 Lead 锁定档位纪律与队员 blocked 处理措辞（`orchestrator.buildPolicy`），减少冗余说明，保留「回执 / 不轮询 / 只改 writeScopes」硬约束。
+- **P2 健壮性**：`report.buildReport` 对缺失/半成品 run 全面空值兜底（ledger/plan/stages/tasks/verdict 等），任何字段缺失不再 TypeError；`makeLlmClassifier` 移除硬编码的 `magpie/workbuddy/deepseek-v4.1-flash` 回退路由：优先使用宿主当前默认模型，取不到则返回 null 交由上层回退关键词分类，避免模型不存在时分类静默失败、掩盖真实配置问题。
+- **测试**：新增 `strict-finish-gates`、`policy-degrade`、`report`、`llm-classifier` 4 个测试；更新 api-contract / autoprovision / bugfix-1113 / core-audit-regression / manifest / payload-size-061 / pipeline / spawn-prompt-cache 8 个测试。`npm run ci` 350/349/0/1、`npm run test:smoke` 5/5 全绿。
+
 ## [0.6.2] - 2026-11-17
 
 ### 安装链路修复 + 版本声明 + 市场/Release 全面更新

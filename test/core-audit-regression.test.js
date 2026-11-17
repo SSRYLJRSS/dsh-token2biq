@@ -80,7 +80,7 @@ test('strict：验证 PASS 之后又 FAIL，finish(PASS) 必须拒；finish(FAIL
   const { run } = s.start({ goal: 'x', mode: 'S2' });
   s.record({ runId: run.id, stage: 'plan', status: 'done', summary: '验收：x' });
   s.record({ runId: run.id, stage: 'generate', status: 'done', files: ['a.js'], diffSummary: 'impl' });
-  s.record({ runId: run.id, stage: 'verify', status: 'done', verdict: 'PASS', testsRun: 'node --test' });
+  s.record({ runId: run.id, stage: 'verify', status: 'done', verdict: 'PASS', testsRun: [{ cmd: 'node --test', ok: true }] });
   // 严格模式下验证必须带 testsRun 证据（即使 FAIL）。
   s.record({ runId: run.id, stage: 'verify', status: 'done', verdict: 'FAIL', evidence: ['3 条用例失败'], testsRun: [{ cmd: 'node --test', ok: false }] });
   const f = s.finish({ runId: run.id, verdict: 'PASS' });
@@ -97,7 +97,7 @@ test('strict：重新实现后，旧的验证 PASS 不再算数', () => {
   const { run } = s.start({ goal: 'x', mode: 'S2' });
   s.record({ runId: run.id, stage: 'plan', status: 'done', summary: '验收：x' });
   s.record({ runId: run.id, stage: 'generate', status: 'done', files: ['a.js'], diffSummary: 'v1' });
-  s.record({ runId: run.id, stage: 'verify', status: 'done', verdict: 'PASS', testsRun: 'node --test' });
+  s.record({ runId: run.id, stage: 'verify', status: 'done', verdict: 'PASS', testsRun: [{ cmd: 'node --test', ok: true }] });
   s.record({ runId: run.id, stage: 'generate', status: 'done', files: ['a.js'], diffSummary: 'v2 改坏了' });
   const f = s.finish({ runId: run.id, verdict: 'PASS' });
   assert.equal(f.ok, false, '验证必须发生在新产物之后');
@@ -110,7 +110,7 @@ test('strict 多候选：judge 最新回执 FAIL 时 finish(PASS) 必须拒', ()
   s.record({ runId: run.id, stage: 'plan', status: 'done', summary: '验收：x' });
   s.record({ runId: run.id, stage: 'generate', status: 'done', files: ['a.js'], diffSummary: 'c1', candidateId: 1 });
   s.record({ runId: run.id, stage: 'generate', status: 'done', files: ['b.js'], diffSummary: 'c2', candidateId: 2 });
-  s.record({ runId: run.id, stage: 'verify', status: 'done', verdict: 'PASS', testsRun: 'node --test' });
+  s.record({ runId: run.id, stage: 'verify', status: 'done', verdict: 'PASS', testsRun: [{ cmd: 'node --test', ok: true }] });
   s.record({ runId: run.id, stage: 'judge', status: 'done', verdict: 'FAIL', issues: ['c1 更差'], selectedCandidate: 2 });
   const f = s.finish({ runId: run.id, verdict: 'PASS' });
   assert.equal(f.ok, false, 'FAIL 的 judge 不能替人放行');
@@ -193,7 +193,7 @@ test('幂等：产物更新后同样的验证命令必须重新生效（finish �
   const { run } = s.start({ goal: 'x', mode: 'S2' });
   s.record({ runId: run.id, stage: 'plan', status: 'done', summary: '验收：x' });
   s.record({ runId: run.id, stage: 'generate', status: 'done', files: ['a.js'], diffSummary: 'v1' });
-  const verify = { runId: run.id, stage: 'verify', status: 'done', verdict: 'PASS', testsRun: 'node --test', teamTaskId: 'task-v' };
+  const verify = { runId: run.id, stage: 'verify', status: 'done', verdict: 'PASS', testsRun: [{ cmd: 'node --test', ok: true }], teamTaskId: 'task-v' };
   assert.equal(s.record(verify).ok, true);
   s.record({ runId: run.id, stage: 'generate', status: 'done', files: ['a.js'], diffSummary: 'v2' });
   const re = s.record(verify); // 同命令、同回执
@@ -353,7 +353,7 @@ test('strict finish：当前有效 review 为 FAIL 必须拒绝交付，同 slot
   const { run } = s.start({ goal: 'x', mode: 'S3', acceptance: '可恢复' });
   const rid = run.id;
   s.record({ runId: rid, stage: 'generate', files: ['a.js'], diffSummary: '实现', teamTaskId: 'G1', owner: 'w' });
-  s.record({ runId: rid, stage: 'verify', verdict: 'PASS', testsRun: ['node --test'], teamTaskId: 'V1', owner: 'v' });
+  s.record({ runId: rid, stage: 'verify', verdict: 'PASS', testsRun: [{ cmd: 'node --test', ok: true }], teamTaskId: 'V1', owner: 'v' });
   s.record({ runId: rid, stage: 'review', verdict: 'FAIL', issues: ['边界用例缺失'], teamTaskId: 'R1', owner: 'rev' });
   const fin = s.finish({ runId: rid, verdict: 'PASS' });
   assert.equal(fin.ok, false, '当前有效 review=FAIL 时不得交付');
@@ -489,7 +489,7 @@ test('R2：新 generate 后第一次相同 verify 作为新验证，紧接着重
   s.updateSettings({ forceTeam: 'off' });
   const { run } = s.start({ goal: 'x', mode: 'S2' });
   s.record({ runId: run.id, stage: 'generate', files: ['a.js'], diffSummary: 'v1', teamTaskId: 'G', owner: 'w' });
-  const v = { runId: run.id, stage: 'verify', verdict: 'PASS', testsRun: ['node --test'], teamTaskId: 'V', owner: 'v' };
+  const v = { runId: run.id, stage: 'verify', verdict: 'PASS', testsRun: [{ cmd: 'node --test', ok: true }], teamTaskId: 'V', owner: 'v' };
   assert.equal(s.record(v).ok, true);
   s.record({ runId: run.id, stage: 'generate', files: ['a.js', 'b.js'], diffSummary: 'v2', teamTaskId: 'G', owner: 'w' });
   const first = s.record(v);

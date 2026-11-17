@@ -5,8 +5,9 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   collectModelRefs, findEntryBlock, applyProvision, runAutoProvision,
-  AGENT_TEAM_ID, MODEL_SELECTION_ID,
+  resolveProfileDetailed, AGENT_TEAM_ID, MODEL_SELECTION_ID,
 } from '../lib/autoprovision.js';
+import { normalizeProvisionProfile } from '../lib/settings.js';
 
 function tmpHome() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 't2bq-provision-'));
@@ -154,4 +155,129 @@ test('runAutoProvision 在 autoProvision=false 时完全不动宿主', () => {
   const r = runAutoProvision({ autoProvision: false, home: root, profile: 'desktop' });
   assert.equal(r.disabled, true);
   assert.equal(fs.existsSync(patch), false);
+});
+
+// ---- P0-1：活动 profile 解析（跨机器/首次使用不再默认 desktop） ----
+
+function makeHomeWith(profiles) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 't2bq-prof-'));
+  for (const p of profiles) fs.mkdirSync(path.join(root, 'profiles', p), { recursive: true });
+  return root;
+}
+function withEnv(v, fn) {
+  const old = process.env.DSH_PROFILE;
+  if (v == null) delete process.env.DSH_PROFILE; else process.env.DSH_PROFILE = v;
+  try { return fn(); } finally {
+    if (old == null) delete process.env.DSH_PROFILE; else process.env.DSH_PROFILE = old;
+  }
+}
+
+test('P0-1：tmp DSH_HOME 只有 web → 枚举唯一命中 web（不再默认 desktop）', () => {
+  const root = makeHomeWith(['web']);
+  withEnv(null, () => {
+    const rr = resolveProfileDetailed({ home: root });
+    assert.equal(rr.ok, true);
+    assert.equal(rr.profile, 'web');
+    assert.equal(rr.source, 'enumerated');
+  });
+});
+
+test('P0-1：desktop+web 歧义 → ok:false + 候选，且 applyProvision 不写任何文件', () => {
+  const root = makeHomeWith(['desktop', 'web']);
+  withEnv(null, () => {
+    const rr = resolveProfileDetailed({ home: root });
+    assert.equal(rr.ok, false);
+    assert.equal(rr.source, 'ambiguous');
+    assert.deepEqual(rr.candidates, ['desktop', 'web']);
+    const ap = applyProvision({ home: root });
+    assert.equal(ap.ok, false);
+    assert.deepEqual(ap.candidates, ['desktop', 'web']);
+    assert.equal(fs.existsSync(path.join(root, 'profiles', 'desktop', 'cordis.patch.yml')), false);
+    assert.equal(fs.existsSync(path.join(root, 'profiles', 'web', 'cordis.patch.yml')), false);
+  });
+});
+
+test('P0-1：优先级 显式 > provisionProfile > DSH_PROFILE > 枚举；非法名被忽略', () => {
+  const root = makeHomeWith(['desktop', 'web', 'work']);
+  withEnv('web', () => {
+    assert.equal(resolveProfileDetailed({ home: root, profile: 'work', provisionProfile: 'desktop' }).profile, 'work');
+    assert.equal(resolveProfileDetailed({ home: root, provisionProfile: 'desktop' }).profile, 'desktop');
+    assert.equal(resolveProfileDetailed({ home: root }).profile, 'web');
+    assert.equal(resolveProfileDetailed({ home: root, profile: '../evil' }).profile, 'web', '非法 profile 名必须被忽略');
+  });
+});
+
+test('P0-1：provisionProfile 设置写入指定 profile；normalize 校验非法名', () => {
+  const root = makeHomeWith(['web']);
+  fs.writeFileSync(path.join(root, 'settings.yaml'), SETTINGS_YAML, 'utf8');
+  withEnv(null, () => {
+    const rr = applyProvision({ home: root, provisionProfile: 'web' });
+    assert.equal(rr.ok, true);
+    assert.equal(rr.profileTargeted, 'web');
+    assert.ok(fs.existsSync(path.join(root, 'profiles', 'web', 'cordis.patch.yml')));
+  });
+  assert.equal(normalizeProvisionProfile('work'), 'work');
+  assert.equal(normalizeProvisionProfile(' ../evil '), null);
+  assert.equal(normalizeProvisionProfile('a/b'), null);
+  assert.equal(normalizeProvisionProfile('..'), null);
+  assert.equal(normalizeProvisionProfile(123), null);
+});
+
+// ---- P2-2：已有本插件条目增量追加缺失模型 ----
+
+test('P2-2：本插件写入的 enabled 条目按最新 models 增量追加缺失模型（保留已有内容）', () => {
+  const { root, patch, settings } = tmpHome();
+  fs.writeFileSync(settings, SETTINGS_YAML, 'utf8');
+  fs.writeFileSync(patch, '', 'utf8');
+  assert.equal(applyProvision({ home: root, profile: 'desktop' }).changed, true);
+  // 用户/宿主新增一个模型后重跑：应增量追加，不重写整块。
+  const yaml2 = [
+    'llm-pi-ai:', '  providers:', '    magpie:', '      displayName: Magpie', '      models:',
+    '        - id: workbuddy/hy4std', '          name: Hy4',
+    '        - id: workbuddy/glm-5.3-flash', '          name: GLM',
+    '        - id: workbuddy/new-model', '          name: New',
+  ].join('\n') + '\n';
+  fs.writeFileSync(settings, yaml2, 'utf8');
+  const r2 = applyProvision({ home: root, profile: 'desktop' });
+  assert.equal(r2.ok, true);
+  assert.equal(r2.changed, true);
+  assert.deepEqual(r2.merged, [MODEL_SELECTION_ID]);
+  const after = fs.readFileSync(patch, 'utf8');
+  assert.ok(after.includes('workbuddy/new-model'), '缺失模型应被追加');
+  assert.ok(after.includes('workbuddy/hy4std'), '已有模型必须保留');
+  assert.ok(after.includes('workbuddy/glm-5.3-flash'), '已有模型必须保留');
+  assert.match(after, /defaultEnabled: true/);
+});
+
+test('P2-2：enabled!=true 或非本插件条目 → 不改其 allowedModels（skipped）', () => {
+  const { root, patch, settings } = tmpHome();
+  fs.writeFileSync(settings, SETTINGS_YAML, 'utf8');
+  const userBlock = [
+    '- id: subagent-model-selection-settings',
+    '  config:',
+    '    enabled: false',
+    '    allowedModels:',
+    '      - provider: magpie',
+    '        model: workbuddy/hy4std',
+    '',
+  ].join('\n');
+  fs.writeFileSync(patch, userBlock, 'utf8');
+  const rr = applyProvision({ home: root, profile: 'desktop' });
+  assert.equal(rr.ok, true);
+  assert.ok(rr.skipped.some((s) => s.id === MODEL_SELECTION_ID));
+  assert.equal((rr.merged || []).includes(MODEL_SELECTION_ID), false);
+  const after = fs.readFileSync(patch, 'utf8');
+  assert.match(after, /enabled: false/, '用户 enabled:false 必须保留');
+  assert.ok(!after.includes('workbuddy/glm-5.3-flash'), '不应把模型塞进用户/非本插件条目');
+});
+
+test('P0-1：profiles 枚举排除备份/临时目录，desktop.bak 不再造成假 ambiguous', () => {
+  const root = makeHomeWith(['desktop', 'desktop.bak', 'desktop-tmp', '~tmp']);
+  withEnv(null, () => {
+    const rr = resolveProfileDetailed({ home: root });
+    assert.equal(rr.ok, true, '备份目录不应被当成候选');
+    assert.equal(rr.profile, 'desktop');
+    assert.equal(rr.source, 'enumerated');
+    assert.deepEqual(rr.candidates, ['desktop']);
+  });
 });

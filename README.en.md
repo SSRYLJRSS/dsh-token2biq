@@ -8,7 +8,7 @@
 
 [![GitHub](https://img.shields.io/badge/GitHub-SSRYLJRSS%2Fdsh--token2biq-181717?logo=github)](https://github.com/SSRYLJRSS/dsh-token2biq)
 [![CI](https://github.com/SSRYLJRSS/dsh-token2biq/actions/workflows/ci.yml/badge.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-v0.6.2-3B82F6.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
+[![Version](https://img.shields.io/badge/version-v0.6.3-3B82F6.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
 [![Releases](https://img.shields.io/github/v/release/SSRYLJRSS/dsh-token2biq?display_name=tag&color=3B82F6)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-3B82F6.svg)](LICENSE)
 [![DSH](https://img.shields.io/badge/DSH-%3E%3D0.2.2--rc.3%20%3C0.3.0-10B981.svg)](https://github.com/deepseek-ai/deepseek-harness)
@@ -64,7 +64,7 @@ dsh plugin --profile desktop add github:SSRYLJRSS/dsh-token2biq
 
 ```sh
 # Pinned version (reproducible)
-dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/download/v0.6.2/dsh-token2biq-0.6.2.tgz
+dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/download/v0.6.3/dsh-token2biq-0.6.3.tgz
 
 # Or always the latest release
 dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/latest/download/dsh-token2biq.tgz
@@ -96,7 +96,7 @@ rm -f ~/.dsh/profiles/desktop/node_modules/dsh-token2biq
 
 ### Version & compatibility
 
-- Package version: `0.6.2`
+- Package version: `0.6.3`
 - DSH compatibility: `>=0.2.2-rc.3 <0.3.0-0`, declared in both `engines.dsh` and `dsh.compatibility.dsh`
 - The market and host read `engines.dsh`, so there is no "version undeclared / compatibility unknown" state
 
@@ -149,9 +149,17 @@ Settings live in `~/.dsh/token2biq/settings.json`. Hard-enforced on `record`: `f
 3. `pipelineGate` defaults to `off` (see the A/B note above).
 4. "Real token" is process-wide (host `llm/stream` usage carries no `runId`), so it can be higher than one run's true cost.
 5. `generate` is serial by default (shared cwd, no file lock); parallel tasks need disjoint `writeScopes`.
-6. HTTP routes are gated by the official `ctx.connection.requestRejection` (untrusted Host/Origin → 403, unauthenticated → 401), layered with an Origin allowlist + mandatory `application/json` (missing/non-JSON → 415), and a 1 MB `readJson` body cap.
+6. HTTP routes are gated by the official `ctx.connection.requestRejection` (untrusted Host/Origin → 403, unauthenticated → 401), with `application/json` body parsing and a 1 MB `readJson` cap; access control is delegated to the host's `requestRejection` (the plugin keeps no separate Origin allowlist).
 
 ---
+
+## Install & active-profile resolution
+
+- **Market TLS**: the market installs from GitHub; `UNABLE_TO_VERIFY_LEAF_SIGNATURE` means local Node distrusts GitHub's chain — run `$env:NODE_OPTIONS='--use-system-ca'` (PowerShell) before install/launch.
+- **Junction cleanup**: a `link:` install creates a directory junction at the profile's `node_modules/dsh-token2biq`; remove it before switching back to a market/cloud install, or pnpm fails with `ERR_PNPM_EPERM ... rename`.
+- **Active profile (priority)**: explicit `profile` → `provisionProfile` setting → `DSH_PROFILE` env → reverse-derived from the plugin path `profiles/<name>/node_modules` → enumerate `~/.dsh/profiles/*` (only a unique hit). With several profiles and no reliable source it writes nothing and `action=provision` returns `ok:false` + `candidates` — it never silently writes `desktop`.
+- **`provisionStatus`**: the latest auto-provision result (`ok/changed/patchFile/profileTargeted/candidates/error`) is visible via `action=state`; a startup failure is `console.warn`ed and recorded there without blocking DSH.
+- **`action=provision`**: manual re-run (idempotent), returns `profileTargeted / patchFile / candidates / added / merged / unchanged / skipped`.
 
 ## Automatic host setup (no manual ticking)
 
@@ -174,13 +182,13 @@ Disable with `autoProvision: false`, re-run with `token2biq action=provision`, r
 
 | Document | Contents |
 | --- | --- |
-| [CHANGELOG.md](CHANGELOG.md) | Release notes (currently **0.6.2**) |
+| [CHANGELOG.md](CHANGELOG.md) | Release notes (currently **0.6.3**) |
 | [Install & upgrade guide](docs/INSTALL.md) | Market/CLI/source install, junction cleanup, version declaration, rollback |
 | [0.6 optimization notes](docs/OPTIMIZATION-0.6.md) | 0.6.0 tier rebalance, thinking effort, prompt slimming |
 | [Architecture](docs/ARCHITECTURE.md) | Execution model, module responsibilities, maintenance boundaries |
 | [Verification](docs/VERIFICATION.md) | Test entry points, verified scope, measured results |
 | [Audit report](docs/AUDIT-2026-11-16.md) | Review and fix acceptance record |
-| [GitHub Releases](https://github.com/SSRYLJRSS/dsh-token2biq/releases) | Release notes and version distribution (`v0.6.2`) |
+| [GitHub Releases](https://github.com/SSRYLJRSS/dsh-token2biq/releases) | Release notes and version distribution (`v0.6.3`) |
 
 ---
 

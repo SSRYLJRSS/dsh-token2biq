@@ -44,7 +44,7 @@ test('strict：verify 无 testsRun 被拒；带 testsRun 且 PASS 后 finish 放
   const v1 = svc.record({ runId, stage: 'verify', status: 'done', verdict: 'PASS' });
   assert.equal(v1.ok, false);
   assert.match(v1.error, /testsRun/);
-  const v2 = svc.record({ runId, stage: 'verify', status: 'done', verdict: 'PASS', testsRun: 'npm test' });
+  const v2 = svc.record({ runId, stage: 'verify', status: 'done', verdict: 'PASS', testsRun: [{ cmd: 'npm test', ok: true }] });
   assert.equal(v2.ok, true);
   const f = svc.finish({ runId, verdict: 'PASS' });
   assert.equal(f.ok, true);
@@ -94,7 +94,7 @@ test('strict+多候选：generate 需 candidateId、judge 需 selectedCandidate�
   assert.match(jbad.error, /selectedCandidate/);
   const j1 = svc.record({ runId, stage: 'judge', status: 'done', verdict: 'PASS', selectedCandidate: 1, rationale: '候选 1 单测覆盖最高' });
   assert.equal(j1.ok, true);
-  svc.record({ runId, stage: 'verify', status: 'done', verdict: 'PASS', testsRun: 'npm test' });
+  svc.record({ runId, stage: 'verify', status: 'done', verdict: 'PASS', testsRun: [{ cmd: 'npm test', ok: true }] });
   const f = svc.finish({ runId, verdict: 'PASS' });
   assert.equal(f.ok, true);
 });
