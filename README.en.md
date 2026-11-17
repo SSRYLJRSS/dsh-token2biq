@@ -57,6 +57,8 @@ dsh plugin --profile desktop add github:SSRYLJRSS/dsh-token2biq
 ```
 
 > Same source the market uses. Replace `desktop` with your profile name (e.g. `web`). If your network can only reach GitHub Releases, use the prebuilt tarball in option 3.
+>
+> If you hit `UNABLE_TO_VERIFY_LEAF_SIGNATURE`, run `$env:NODE_OPTIONS='--use-system-ca'` in PowerShell, then retry; the local Node trust store is rejecting the GitHub certificate chain, not the plugin.
 
 ### 3) Prebuilt tarball (optional)
 

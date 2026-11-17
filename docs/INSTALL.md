@@ -18,6 +18,8 @@ dsh plugin --profile desktop add github:SSRYLJRSS/dsh-token2biq
 
 把 `desktop` 换成实际 profile 名（`dsh plugin --profile <name>`）。安装完成后同样要**完整重启 DSH**。
 
+> 若报 `UNABLE_TO_VERIFY_LEAF_SIGNATURE`：PowerShell 先执行 `$env:NODE_OPTIONS='--use-system-ca'` 再运行；这是本机 Node 不信任 GitHub 证书链。
+
 验证：
 
 ```sh

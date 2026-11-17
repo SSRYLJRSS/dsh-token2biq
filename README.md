@@ -79,6 +79,8 @@ dsh plugin --profile desktop add github:SSRYLJRSS/dsh-token2biq
 ```
 
 > 这是与插件市场相同的安装源。把 `desktop` 换成实际 profile 名（如 `web`）。若网络只能直连 GitHub Release，可改用方式三的预构建 tarball。
+>
+> 若报 `UNABLE_TO_VERIFY_LEAF_SIGNATURE`，先在 PowerShell 执行 `$env:NODE_OPTIONS='--use-system-ca'` 再重试；这是本机 Node 不信任 GitHub 证书链，不是插件问题。
 
 ### 方式三：预构建 tarball（可选）
 
