@@ -6,7 +6,7 @@
 
 1. 打开 **DeepSeek Harness Desktop → 设置 → 插件**。
 2. 搜索 `dsh-token2biq`，点击安装。
-3. **完整退出 DSH**（不是只关窗口），再重新启动。
+3. **完整退出 DSH**（不是只关窗口），再重新启动。首次加载会写入宿主配置；若宿主没有热重载，再重启一次让配置生效。
 
 市场按注册表的 **GitHub 源**安装。包内零运行时依赖、没有 build 脚本；插件加载时会自动补好 Agent Teams 与子代理模型选择两项宿主配置，不需要本机编译。
 
@@ -103,7 +103,7 @@ pnpm 11 对 git 依赖默认不执行 `prepare` 构建脚本。本包没有 buil
 - `- id: agent-team` → `config.defaultEnabled: true`、`maxTasks: 256`
 - `- id: subagent-model-selection-settings` → `config.enabled: true` + 从 `settings.yaml` 扫描到的 `allowedModels`
 
-安全边界：不改 `settings.yaml`；只追加；同 id 已有配置不覆盖；写前备份 `cordis.patch.yml.bak-token2biq-<时间戳>`；临时文件 + 原子替换 + 写后校验；失败回滚。修改后需重启 DSH 生效。
+安全边界：不改 `settings.yaml`；只追加；同 id 已有配置不覆盖；写前备份 `cordis.patch.yml.bak-token2biq-<时间戳>`；临时文件 + 原子替换 + 写后校验；失败回滚。首次加载写入后重启 DSH 生效；若宿主没有热重载，再重启一次。
 
 ## 回滚
 

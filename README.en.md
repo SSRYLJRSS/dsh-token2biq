@@ -153,7 +153,7 @@ Settings live in `~/.dsh/token2biq/settings.json`. Hard-enforced on `record`: `f
 
 ## Automatic host setup (no manual ticking)
 
-On load the plugin provisions two DSH host settings; they take effect after a **DSH restart**:
+On load the plugin provisions two DSH host settings. The first load writes the profile; they take effect after a **DSH restart** (restart once more if the host does not hot-reload):
 
 > Verified on DSH 0.2.2-rc.3 with the Desktop profile: both entries are written; an existing entry with the same id is left untouched.
 
