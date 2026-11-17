@@ -9,7 +9,7 @@
 - **预构建 tarball 分发**：Release 同时提供 `dsh-token2biq-0.6.2.tgz`（固定版本，注册表 pin 用）与 `dsh-token2biq.tgz`（version-free，供 `latest/download` 使用）；包内零运行时依赖、无安装脚本，`dsh plugin add <tarball>` 不需要 `allowBuilds` 授权。
 - **自动配置复核**：`agent-team`（`defaultEnabled: true`、`maxTasks: 256`）与 `subagent-model-selection-settings`（`enabled: true` + 全量 `allowedModels`）已在真实 DSH 0.2.2-rc.3 + Desktop profile 验证生效；继续保证只追加 profile `cordis.patch.yml`、绝不改 `settings.yaml`、已有同 id 配置不覆盖、写前备份 / 原子写 / 写后校验 / 失败回滚。
 - **测试**：新增 `test/manifest.test.js` 锁定版本、`engines.dsh` / `dsh.compatibility.dsh`、bundle patch 与发布 payload；`npm run ci` 与 `npm run test:smoke` 全量通过。
-- **文档**：README / README.en 安装章节按“市场预构建 → CLI 预构建 → 源码开发”重写，补充 junction 清理、版本与兼容声明、Release 双资产与市场 tarball 说明。
+- **文档**：README / README.en 安装章节按“市场 GitHub 源 → CLI GitHub 源 → 预构建 tarball（可选）→ 本地源码 link”重写，补充 junction 清理、版本与兼容声明、TLS 证书链排障与 Release 双资产说明。
 
 ## [0.6.1] - 2026-11-17
 
