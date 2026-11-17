@@ -38,11 +38,20 @@
 
 ## 本次安装源与活跃运行状态
 
-2026-11-16，Lead 已核验 desktop profile 的插件 symlink 指向本仓库；源码已更新实际安装源。官方 runtime 版本为 0.2.2-rc.3，相关 setEnabled 契约已从最新宿主打包源码核验。
+2026-11-17，Lead 已核验 desktop profile 的安装源为 commit-pinned GitHub 源（`git+https://github.com/SSRYLJRSS/dsh-token2biq.git#34eed5722adc3d43f057e0207c529bc92ac22e40`，版本 0.6.2）；旧的 `node_modules/dsh-token2biq` 目录联接已删除并替换为真实目录。官方 runtime 版本为 0.2.2-rc.3。
 
 活跃进程仍为旧后端，须完整重启 DSH 后再确认新产物生效。安装源已更新不等于内存代码已替换，也不等于已通过真实GUI验收；本轮未启动替代服务器。
 
-## 本轮（0.5.1）最终验证状态与未覆盖项
+## 本轮（0.6.2）最终验证状态与未覆盖项
+
+- `npm run ci`：327 项 / 326 通过 / 0 失败 / 1 条件跳过；`pack:check` 21 个文件、13 个 lib 模块齐全。
+- `npm run test:smoke`：5/5。
+- 自动配置专项：临时 DSH_HOME + 双模型 provider，首次写入 `agent-team`（defaultEnabled: true）与 `subagent-model-selection-settings`（enabled: true + allowedModels）；重复运行 0 变更。
+- 安装：desktop profile `dsh plugin why` = 0.6.2；市场等价 commit-pinned GitHub 源安装 20.3s；CLI GitHub 源安装 12.2s/13.9s；预构建 tarball + `NODE_OPTIONS=--use-system-ca` 6.8s。
+- Release v0.6.2 两资产 sha256 = `bddfc194a7b2c98450bcb1917a925f509958aef0a3228d8be6668fc46a99eb3b`；`engines.dsh` 与 `dsh.compatibility.dsh` 均为 `>=0.2.2-rc.3 <0.3.0-0`。
+- 未覆盖项：已登录 GUI 的真实浏览器端到端、完整重启 DSH 后新后端产物生效；不据此宣称已通过。
+
+## 历史（0.5.1）最终验证状态与未覆盖项
 
 以下为最终静止树证据（未改源码）。
 
