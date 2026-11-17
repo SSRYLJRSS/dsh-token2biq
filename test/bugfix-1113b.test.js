@@ -24,8 +24,8 @@ test('compactToolResult：大 start 结果不整体丢弃，保留 created/model
     modelRouting: [{ stage: 'review', model: 'm::x' }],
     next: 'spawn / send / wait',
   };
-  const out = compactToolResult(result, 12000);
-  assert.ok(out.length <= 12000, '输出必须 ≤ 12000 字符');
+  const out = compactToolResult(result, 8192);
+  assert.ok(out.length <= 8192, '输出必须 ≤ 8192 字符');
   const p = JSON.parse(out);
   assert.ok(p.created && p.created.tasks[0].taskId === 't1', 'created.tasks 必须保留');
   assert.ok(Array.isArray(p.modelRouting) && p.modelRouting.length === 1, 'modelRouting 必须保留');

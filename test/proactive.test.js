@@ -119,7 +119,7 @@ test('startWithAuto: 团队协作关闭（isEnabled=false）→ 完全不动手�
 });
 
 test('buildRoster: independentReview 开启时 review/judge 标记 independent，generate 不标', () => {
-  const plan = generatePlan('S3', {});
+  const plan = generatePlan('S3', { risk: 'high' });
   const pb = buildTeamPlaybook(plan, { independentReview: true });
   const roster = buildRoster(plan, pb);
   const byStage = Object.fromEntries(roster.map((r) => [r.stage, r]));
@@ -347,7 +347,7 @@ test('打磨：compactToolResult 对 state 形状不能削成空壳', async () =
   assert.ok(Array.isArray(parsed.runs) && parsed.runs.length > 0, 'runs 不能丢');
   assert.ok(parsed.current && parsed.current.id === 'run_39', 'current 不能丢');
   assert.ok(Array.isArray(parsed.current.tasks), 'current.tasks 不能丢');
-  assert.ok(out.length <= 12000, '必须压到限额内，实际 ' + out.length);
+  assert.ok(out.length <= 8192, '必须压到限额内，实际 ' + out.length);
 });
 
 test('打磨：compactToolResult 对 start 形状仍保留 created/next', async () => {
@@ -367,7 +367,7 @@ test('打磨：compactToolResult 对 start 形状仍保留 created/next', async 
   assert.equal(parsed.ok, true);
   assert.ok(parsed.created, 'created 不能丢');
   assert.ok(parsed.next, 'next 不能丢');
-  assert.ok(out.length <= 12000, '必须压到限额内，实际 ' + out.length);
+  assert.ok(out.length <= 8192, '必须压到限额内，实际 ' + out.length);
 });
 
 test('打磨：事件流按序留痕（start -> stage -> verdict）', async () => {
@@ -417,9 +417,8 @@ test('打磨：事件条数超上限时截断最旧', async () => {
 
 test('打磨：review 重试通过后阶段自愈为 done（不被历史 FAIL 粘死）', async () => {
   const s = svc();
-  const team = { isEnabled: () => true, createTask: async () => ({ id: 't1', revision: 1, status: 'pending' }) };
-  const res = await s.startWithAuto({ goal: 'x', mode: 'S1' }, { agentTeams: team, agent: { id: 'lead-1' } });
-  const runId = res.run.id;
+  s.updateSettings({ forceTeam: 'off' });
+  const runId = s.start({ goal: 'x', mode: 'S2' }).run.id;
   s.record({ runId, stage: 'review', status: 'done', verdict: 'FAIL', summary: '有问题', issues: ['a'] });
   const afterFail = s.runView(s.store.getRun(runId)).stages.find((x) => x.kind === 'review');
   assert.equal(afterFail.status, 'failed', 'FAIL 后阶段应为 failed');

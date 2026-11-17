@@ -8,7 +8,7 @@
 
 [![GitHub](https://img.shields.io/badge/GitHub-SSRYLJRSS%2Fdsh--token2biq-181717?logo=github)](https://github.com/SSRYLJRSS/dsh-token2biq)
 [![CI](https://github.com/SSRYLJRSS/dsh-token2biq/actions/workflows/ci.yml/badge.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-v0.5.1-3B82F6.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
+[![Version](https://img.shields.io/badge/version-v0.6.1-3B82F6.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
 [![Releases](https://img.shields.io/github/v/release/SSRYLJRSS/dsh-token2biq?display_name=tag&color=3B82F6)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-3B82F6.svg)](LICENSE)
 [![DSH](https://img.shields.io/badge/DSH-%3E%3D0.2.0--rc.1%20%3C0.3.0-10B981.svg)](https://github.com/deepseek-ai/deepseek-harness)
@@ -62,19 +62,37 @@ dsh plugin --profile desktop add link:./dsh-token2biq
 
 ## Tiers
 
-| Tier | Max agents | Stages | Suggested review rounds | Relative cost |
-| --- | ---: | --- | ---: | ---: |
-| **S1** | 1 | generate → review → verify | 1 | ×2 |
-| **S2** | 3 | plan → generate → review → verify | 3 | ×5 |
-| **S3** | 6 | research → plan → generate → review → judge → redteam → regression | 3 | ×10 |
-| **S4** | 8 | same as S3, plus multi-candidate parallel review/judge/redteam | 3 | ×16 |
-| **Auto** | — | keyword screen → low-effort model check → fallback to keywords | — | — |
+| Tier | Max agents | Stages | Relative cost |
+| --- | ---: | --- | ---: |
+| **S1** | 1 | generate → verify (2 stages, 1 agent) | ×2 |
+| **S2** | 3 | plan → generate → review → verify (4 stages) | ×5 |
+| **S3** | 5 | core 5: research → plan → generate → review → regression; high risk adds judge / redteam (7 stages total) | ×10 |
+| **S4** | 8 | full 7: research → plan → generate → review → judge → redteam → regression, with two-way parallel review (two independent models blind-review the generate output; any FAIL fails the stage) | ×16 |
+| **Auto** | — | keyword screen → low-effort model check → fallback to keywords | — |
 
-`reviewRounds` is execution guidance, not automatic repetition. The task board and recorded receipts show the reviews actually completed.
+> S3's judge / redteam are **high-risk add-ons**: they run only when `start` passes `risk: "high"` (or `strict`); `regression` is a core stage and always runs, so normal tasks run the core 5 stages. S4's "two-way review" runs the same `review` stage with two independent models in parallel blind review (any FAIL fails the stage); other stages are not parallelized.
+
+## Thinking effort (reasoning)
+
+When a stage calls a model, you choose not only *which* model but *how hard it thinks*. The default is **auto**: no explicit level; it is derived from a "tier × role" matrix.
+
+- **Default auto matrix** (`settings.reasoning.default = "auto"`): resolves per tier and role (`MODE_ROLE_EFFORT`):
+
+| Tier | research | plan | generate | review | judge | redteam | verify | regression | default |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| S1 | — | — | high | high | — | — | high | — | high |
+| S2 | — | high | high | high | — | — | high | — | high |
+| S3 | high | high | high | high | xhigh | high | high | high | high |
+| S4 | high | xhigh | high | xhigh | xhigh | xhigh | high | high | high |
+
+- **Per-role override**: `settings.reasoning.byRole[<role>]` — one of `off / minimal / low / medium / high / xhigh / max`.
+- **Per-model override**: `settings.reasoning.byModel["provider::model"]`.
+- **Precedence**: per-model > per-role > global default `auto` (matrix). Configure in the panel's **Settings → Thinking effort** page or the `reasoning` field of `token2biq action=settings`.
+- **Reasoning capability**: resolution reads `reasoning.supportedEfforts` first (legacy `reasoning.efforts` as fallback) plus `reasoning.defaultEffort`. Legacy models with only `defaultEffort` (no selectable levels) cause the plugin to **omit** `reasoning_effort` and call normally (no error; the panel shows "only default <level>"); if the preferred level is not offered, it **steps down** along `off → minimal → low → medium → high → xhigh → max` to the nearest available, then the model default.
 
 ## Configuration (what is enforced vs. advisory)
 
-Settings live in `~/.dsh/token2biq/settings.json`. Hard-enforced on `record`: `forceTeam` (S2/S3/S4 require `teamTaskId`+`owner`), `allowModels`, `requireDifferentVendor`, `independentReview` (owner ≠ generator), and `pipelineGate=strict`. Per-role `rolePools`/`roleModels` are **advisory** — written into the playbook, executed by the Lead via `subagent(provider/model)`.
+Settings live in `~/.dsh/token2biq/settings.json`. Hard-enforced on `record`: `forceTeam` (S2/S3/S4 require `teamTaskId`+`owner`), `allowModels`, `independentReview` (owner ≠ generator), and `pipelineGate=strict`. Per-role `rolePools` are **advisory**; `roleModels` is a read-only derived field and is never persisted — `rolePools` are written into the playbook, executed by the Lead via `subagent(provider/model)`.
 
 ## Design limits (please read before installing)
 
@@ -106,11 +124,12 @@ Disable with `autoProvision: false`, re-run with `token2biq action=provision`, r
 
 | Document | Contents |
 | --- | --- |
-| [CHANGELOG.md](CHANGELOG.md) | Release notes (currently **0.5.1**) |
+| [CHANGELOG.md](CHANGELOG.md) | Release notes (currently **0.6.1**) |
+| [0.6 optimization notes](docs/OPTIMIZATION-0.6.md) | 0.6.0 tier rebalance, thinking effort, prompt slimming |
 | [Architecture](docs/ARCHITECTURE.md) | Execution model, module responsibilities, maintenance boundaries |
 | [Verification](docs/VERIFICATION.md) | Test entry points, verified scope, measured results |
 | [Audit report](docs/AUDIT-2026-11-16.md) | Review and fix acceptance record |
-| [GitHub Releases](https://github.com/SSRYLJRSS/dsh-token2biq/releases) | Release notes and version distribution (`v0.5.1`) |
+| [GitHub Releases](https://github.com/SSRYLJRSS/dsh-token2biq/releases) | Release notes and version distribution (`v0.6.1`) |
 
 ---
 

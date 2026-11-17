@@ -28,12 +28,10 @@ test('finish 后未开始阶段记为 skipped，已记录阶段为 done', () => 
   const svc = mk();
   const { run } = svc.start({ goal: '收尾阶段测试', mode: 'S1' });
   svc.record({ runId: run.id, stage: 'generate', files: ['x'], diffSummary: 'done' });
-  svc.record({ runId: run.id, stage: 'review', verdict: 'PASS', evidence: ['ok'] });
   svc.finish({ runId: run.id, verdict: 'PASS', rationale: '完成' });
   const c = svc.state(run.id).current;
   const st = Object.fromEntries(c.stages.map((s) => [s.kind, s.status]));
   assert.equal(st.generate, 'done');
-  assert.equal(st.review, 'done');
   assert.equal(st.verify, 'skipped'); // S1 有 verify 阶段但未记录 → skipped
   assert.equal(c.verdict.final, 'PASS');
 });

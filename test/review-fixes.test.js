@@ -113,16 +113,15 @@ test('设置落地：模型白名单在 record 上报 model 时硬校验', () =>
   assert.equal(ok.task.model, 'providerA::m1');
 });
 
-test('设置落地：评审必须不同厂商（仅当上报 model 时）', () => {
+test('设置落地：同模型/同 provider 评审允许（requireDifferentVendor 已移除）', () => {
   const svc = mkSvc();
-  svc.updateSettings({ requireDifferentVendor: true, forceTeam: 'off' });
-  const runId = svc.start({ goal: '跨厂商', mode: 'S1' }).run.id;
+  svc.updateSettings({ allowModels: ['p::gen', 'p::rev', 'q::rev'], forceTeam: 'off' });
+  const runId = svc.start({ goal: '同厂商', mode: 'S1' }).run.id;
   svc.record({ runId, stage: 'generate', files: ['a.js'], diffSummary: 'x', model: 'p::gen' });
   const same = svc.record({ runId, stage: 'review', verdict: 'PASS', evidence: ['ok'], model: 'p::rev' });
-  assert.equal(same.ok, false, '同厂商评审应被拒');
-  assert.match(same.error, /同厂商/);
+  assert.equal(same.ok, true, '同 provider 评审不得被拒');
   const diff = svc.record({ runId, stage: 'review', verdict: 'PASS', evidence: ['ok'], model: 'q::rev' });
-  assert.equal(diff.ok, true, '不同厂商评审放行');
+  assert.equal(diff.ok, true, '不同 provider 评审放行');
 });
 
 test('未上报 model 时不做白名单/跨厂商拦截（保持向后兼容）', () => {

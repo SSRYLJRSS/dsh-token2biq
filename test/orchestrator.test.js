@@ -27,7 +27,7 @@ test('resolveMode: Auto 走分类器', () => {
 });
 
 test('PLANS 数据完整性', () => {
-  assert.deepEqual(PLANS.S1.stages, ['generate', 'review', 'verify']);
+  assert.deepEqual(PLANS.S1.stages, ['generate', 'verify']);
   assert.deepEqual(PLANS.S3.stages, ['research', 'plan', 'generate', 'review', 'judge', 'redteam', 'regression']);
   assert.deepEqual(PLANS.S4.stages, ['research', 'plan', 'generate', 'review', 'judge', 'redteam', 'regression']);
   assert.equal(PLANS.S2.maxAgents, 3);
@@ -39,13 +39,13 @@ test('generatePlan: 档位成本权重与阶段数（无硬预算）', () => {
   const p1 = generatePlan('S1');
   assert.equal(p1.mode, 'S1');
   assert.equal(p1.costWeight, 2);
-  assert.equal(p1.stageCount, 3);
+  assert.equal(p1.stageCount, 2);
   assert.equal(p1.maxAgents, 1);
   assert.equal(p1.budget, undefined); // 预算功能已移除
   const p3 = generatePlan('S3');
   assert.equal(p3.costWeight, 10);
-  assert.equal(p3.stageCount, 7);
-  assert.equal(p3.maxAgents, 6);
+  assert.equal(p3.stageCount, 5);
+  assert.equal(p3.maxAgents, 5);
 });
 
 test('generatePlan: Auto 记录请求档与实判档', () => {
@@ -77,7 +77,7 @@ test('generatePlan: Auto 可用 resolvedMode 覆盖分类结果（混合模式�
   const p = generatePlan('Auto', { goal: '帮我看看这个模块', resolvedMode: 'S3' });
   assert.equal(p.requestedMode, 'Auto');
   assert.equal(p.mode, 'S3');
-  assert.equal(p.stageCount, 7);
+  assert.equal(p.stageCount, 5);
 });
 
 test('buildTeamPlaybook: S4 并行多审按角色池拆子步骤，S3 不拆', () => {
@@ -85,10 +85,10 @@ test('buildTeamPlaybook: S4 并行多审按角色池拆子步骤，S3 不拆', (
   const s4 = generatePlan('S4');
   const pb = buildTeamPlaybook(s4, { rolePools: { review: ['a::A', 'b::B', 'c::C'] }, multiReview: true });
   const rev = pb.steps.filter((s) => s.kind === 'review');
-  assert.equal(rev.length, 3);
-  assert.deepEqual(rev.map((s) => s.model), ['a::A', 'b::B', 'c::C']);
+  assert.equal(rev.length, 2);
+  assert.deepEqual(rev.map((s) => s.model), ['a::A', 'b::B']);
   assert.ok(rev.every((s) => s.parallel === true && s.multiReview === true));
-  assert.deepEqual(rev.map((s) => s.candidateIndex), [1, 2, 3]);
+  assert.deepEqual(rev.map((s) => s.candidateIndex), [1, 2]);
   assert.equal(pb.steps.filter((s) => s.kind === 'judge').length, 1); // judge 池为空 → 单条
   assert.ok(pb.modelPlan.multiReview === true);
 
@@ -98,9 +98,9 @@ test('buildTeamPlaybook: S4 并行多审按角色池拆子步骤，S3 不拆', (
   assert.equal(rev3.length, 1);
   assert.equal(rev3[0].model, 'a::A');
 
-  // 上限 MAX_PARALLEL_REVIEWS=5（显式 parallelReviews=5）
+  // 并行多审最多双路：即便 parallelReviews=5 也只拆 2 步
   const pbCap = buildTeamPlaybook(s4, { rolePools: { review: ['a::1', 'a::2', 'a::3', 'a::4', 'a::5', 'a::6', 'a::7'] }, multiReview: true, parallelReviews: 5 });
-  assert.equal(pbCap.steps.filter((s) => s.kind === 'review').length, 5);
+  assert.equal(pbCap.steps.filter((s) => s.kind === 'review').length, 2);
 
   // O1：并行拆分也走 allowModels 白名单（超白名单候选被过滤并出提示）
   const pbAllow = buildTeamPlaybook(s4, { rolePools: { review: ['a::A', 'b::B', 'c::C'] }, allowModels: ['a::A', 'b::B'], multiReview: true });
@@ -115,13 +115,13 @@ test('buildTeamPlaybook: S4 并行多审按角色池拆子步骤，S3 不拆', (
   assert.equal(revAllow1[0].model, 'a::A');
 });
 
-test('buildTeamPlaybook: S4 parallelReviews 控制并行审数量（3→3、1→单审、池不足不报错）', () => {
+test('buildTeamPlaybook: S4 parallelReviews 控制并行审数量（3→2、1→单审、池不足不报错）', () => {
   const s4 = generatePlan('S4');
   const five = ['a::1', 'a::2', 'a::3', 'a::4', 'a::5'];
   const pb3 = buildTeamPlaybook(s4, { rolePools: { review: five }, multiReview: true, parallelReviews: 3 });
   const r3 = pb3.steps.filter((s) => s.kind === 'review');
-  assert.equal(r3.length, 3);
-  assert.equal(r3[0].candidateCount, 3);
+  assert.equal(r3.length, 2);
+  assert.equal(r3[0].candidateCount, 2);
   assert.equal(pb3.modelPlan.parallelReviews, 3);
 
   const pb1 = buildTeamPlaybook(s4, { rolePools: { review: five }, multiReview: true, parallelReviews: 1 });

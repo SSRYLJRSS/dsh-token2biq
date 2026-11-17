@@ -46,8 +46,6 @@ test('record 拒收时不再回传自相矛盾的 forceTeam', () => {
 test('modelRouting 必须拆出 provider/model（只给合并引用等于强模型没配上）', async () => {
   const svc = mk();
   svc.settings.update({
-    strongModel: 'magpie-responses::gptmengluo/gpt-6-astra',
-    normalModel: 'magpie::wps-lingxi/deepseek-v4.1-flash',
     forceTeam: 'auto', pipelineGate: 'off',
     rolePools: { plan: ['magpie-responses::gptmengluo/gpt-6-astra'] },
   });
@@ -61,16 +59,13 @@ test('modelRouting 必须拆出 provider/model（只给合并引用等于强模�
   assert.ok(String(a.next).includes('magpie-responses + gptmengluo/gpt-6-astra'), 'next 必须直接给出可用的 provider/model');
 });
 
-test('强模型配在 plan/judge、档位却是 S1 时必须告警（否则静默 0 命中）', () => {
+test('强模型只从 rolePools 读取，不再有 modelRoutingWarning 字段', () => {
   const svc = mk();
   svc.settings.update({
-    strongModel: 'magpie-responses::gptmengluo/gpt-6-astra',
-    normalModel: 'magpie::wps-lingxi/deepseek-v4.1-flash',
     forceTeam: 'auto', pipelineGate: 'off',
     rolePools: { plan: ['magpie-responses::gptmengluo/gpt-6-astra'], judge: ['magpie-responses::gptmengluo/gpt-6-astra'] },
   });
   const s1 = svc.start({ goal: 'x', mode: 'S1' });
-  assert.ok(/0 命中/.test(s1.modelRoutingWarning || ''), 'S1 不含 plan/judge，必须告警');
-  const s2 = svc.start({ goal: 'x', mode: 'S2' });
-  assert.equal(s2.modelRoutingWarning, null, 'S2 含 plan，不该告警');
+  assert.equal(s1.modelRoutingWarning, undefined);
+  assert.ok(s1.playbook.modelPlan.rolePools.plan.length === 1);
 });

@@ -56,7 +56,7 @@ test('默认构造的 SettingsStore 只写临时目录，真实 ~/.dsh 快照字
   const before = readIfExists(realSettings);
 
   const store = new SettingsStore(); // 不传 file → 走默认解析（若隔离失效就落真实目录）
-  store.update({ maxReviewers: 3 });
+  store.update({ rolePools: { review: ['a::b'] } });
 
   assert.ok(inside(store.file, process.env.DSH_HOME), 'SettingsStore 落到了隔离目录外：' + store.file);
   assert.ok(fs.existsSync(store.file), '应写入隔离目录：' + store.file);

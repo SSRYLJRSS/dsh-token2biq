@@ -33,11 +33,11 @@ test('分类调用期间的 usage 不计入实时 token', () => {
   assert.equal(svc.live.total, 100, '分类结束应正常累计');
 });
 
-test('action=map 把设置（roleModels/forceTeam）带进团队手册', () => {
+test('action=map 把设置（rolePools/forceTeam）带进团队手册', () => {
   const svc = mkService();
-  svc.updateSettings({ roleModels: { generate: 'magpie::workbuddy/deepseek-v4.1-flash' }, forceTeam: 'on' });
+  svc.updateSettings({ rolePools: { generate: ['magpie::workbuddy/deepseek-v4.1-flash'] }, forceTeam: 'on' });
   const r = svc.handleTool({ action: 'map', mode: 'S2' });
   assert.equal(r.ok, true);
-  assert.equal(r.playbook.modelPlan.roleModels.generate, 'magpie::workbuddy/deepseek-v4.1-flash');
+  assert.deepEqual(r.playbook.modelPlan.rolePools.generate, ['magpie::workbuddy/deepseek-v4.1-flash']);
   assert.equal(r.playbook.requireTeam, true);
 });

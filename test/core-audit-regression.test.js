@@ -252,11 +252,11 @@ test('noteUsage：活动运行被删除后必须清 currentRunId', () => {
 
 // ---- 设置 ----
 
-test('settings：只改 roleModels 连续两次都要生效（不被旧 rolePools 遮回）', () => {
+test('settings：只改 rolePools 连续两次都要生效（不被旧 roleModels 遮回）', () => {
   const s = mk();
-  s.updateSettings({ roleModels: { generate: 'p::one' } });
+  s.updateSettings({ rolePools: { generate: ['p::one'] } });
   assert.equal(s.settings.get().roleModels.generate, 'p::one');
-  s.updateSettings({ roleModels: { generate: 'p::two' } });
+  s.updateSettings({ rolePools: { generate: ['p::two'] } });
   assert.equal(s.settings.get().roleModels.generate, 'p::two', '第二次更新不能被旧池遮回去');
   assert.deepEqual(s.settings.get().rolePools.generate, ['p::two']);
 });
@@ -334,12 +334,15 @@ test('DAG：模型路由阶段不再被跳过；同阶段互不阻塞；下游�
   assert.deepEqual(v.blockedBy, [ids[1], ids[2]], '下游依赖上游整组任务');
 });
 
-test('派活提示：明确 ready 不会自动开工', () => {
+test('派活提示：≤400 字符、带 taskId/revision 与 claim→执行→complete，不指示 send_message 汇报', () => {
   const s = mk();
   const { run } = s.start({ goal: 'x', mode: 'S2' });
-  const prompt = s._spawnPrompt(run, { stage: 'generate', role: 'worker', subject: 'g' }, 'task-1');
-  assert.ok(prompt.includes('ready'));
-  assert.ok(prompt.includes('不会自动开工'));
+  const prompt = s._spawnPrompt(run, { stage: 'generate', role: 'worker', subject: 'g', doneWhen: '产出改动' }, 'task-1', 3);
+  assert.ok(prompt.length <= 400, '派活提示必须 ≤400 字符，实际 ' + prompt.length);
+  assert.ok(prompt.includes('task-1'), '必须带上任务 id');
+  assert.ok(prompt.includes('revision=3'), '必须带上 revision');
+  assert.ok(prompt.includes('claim → 执行 → team_task_update complete'), '必须给出 claim→执行→complete 流程');
+  assert.ok(prompt.includes('不要 send_message'), '必须明确不要 send_message 汇报');
 });
 
 // ---- 严收尾 / 评审身份 / 回执幂等 / 异步入口 ----

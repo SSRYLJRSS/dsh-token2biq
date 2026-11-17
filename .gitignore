@@ -16,3 +16,7 @@ test/.tmp/
 
 # 本地审查产物（路径 harness、截图、临时分析），不提交
 analysis/
+
+# 本地演示页与基线快照，不随发布提交
+demo/
+package.json.baseline

@@ -1,5 +1,30 @@
 # 变更日志
 
+## [0.6.1] - 2026-11-17
+
+### 真实宿主思考强度修复 + 高地板矩阵 + 载荷瘦身
+
+- 版本 `0.6.0` → `0.6.1`（未改兼容范围 `dsh >=0.2.0-rc.1 <0.3.0-0`）。
+- **P0 字段错配修复**：`resolveEffort` 优先读真实宿主的 `reasoning.supportedEfforts`（旧 `reasoning.efforts` 兜底），`client.js` 按模型下拉同步；仅 `defaultEffort`、无 `supportedEfforts` 的旧模型显示「仅默认 <档>」而非「不支持思考强度」。修复前真实模型一律解析为 `null`，所有强度设置失效。
+- **P1 高地板矩阵**：`MODE_ROLE_EFFORT` / `V3_EFFORT_MATRIX` 统一仅 `high`/`xhigh`：S1 generate/verify high；S2 四阶段 high；S3 judge 与 S4 plan/review/judge/redteam 用 `xhigh`（不支持时按 `EFFORT_ORDER` 自动降 high），其余 high，兜底 high。不再自动出现 off/minimal/max。
+- **P1 提示词与载荷瘦身**：`_spawnPrompt` 改为稳定前缀 + `---` 动态尾（≤400，利于 prompt 缓存）；`_handoff` 文本 ≤400、files/issues 各 ≤5；`autoBoard` 简报去掉重复 `handoff.items`；`startWithAuto` 返回体把 `playbook.steps`/`roster` 压成执行必需字段；S3 start 序列化 9386 → 约 6697 字节（约 -29%）。
+- **P2 工具输出瘦身**：`TOOL_DESCRIPTION` 压到 3 行；`compactToolResult` 默认上限 12000 → 8192，非 JSON 结果改中段截断（head 4096 + `...[middle pruned]...` + tail 1024），对象仍保留合法 JSON 骨架（created/modelRouting/next）；`TOOL_PARAMETERS` 描述文本精简约 11%。
+- **测试**：新增 `effort-real-schema`、`spawn-prompt-cache`、`payload-size-061`；旧 effort/UI/compact 断言更新到高地板矩阵与 8192 上限。
+
+## [0.6.0] - 2026-11-17
+
+### 编排瘦身与思考强度（token 约 2× 回归修复）
+
+- 版本 `0.5.2` → `0.6.0`。目标：压回大版本后的 token 与耗时膨胀，同时落地可配置的思考强度，并保持质量与旧测试兼容。
+- **档位重排**：S1 精简为 2 阶段（generate → verify，1 个代理）；S2 为 4 阶段（plan → generate → review → verify，最多 3 个代理）；S3 为核心 5 阶段（research → plan → generate → review → regression，最多 5 个代理），`risk=high` 时追加 judge / redteam（共 7 阶段）；S4 为完整 7 阶段（最多 8 个代理），仅 `review` 阶段评审双路并行（最多 2 个独立模型盲审，任一 FAIL 即该阶段 FAIL）。
+- **计划生成**：`generatePlan` 新增 `risk` 入参（low/normal/high/strict），仅高风险进入可选阶段；返回 `optionalStages` / `risk` / `stageCount`。
+- **思考强度（新增）**：设置升到 `version: 3`，新增 `reasoning: { default: 'auto', byRole: {}, byModel: {} }`；导出 `normalizeEffort` / `normalizeReasoning`，`SettingsStore.update` 对 `reasoning` 深合并（`default` 覆盖、`byRole`/`byModel` 浅合并、未提交键保留）。
+- **effort 解析**：导出 `EFFORT_ORDER`（off→minimal→low→medium→high→xhigh→max）与 `MODE_ROLE_EFFORT` 矩阵；`resolveEffort` 按「按模型 > 按角色 > default > 矩阵」取值，模型无 reasoning 能力返回 `null`（调用方省略参数），首选档不支持时按顺序向下就近降档，再退回模型默认档。
+- **手册/花名册/派活**：`buildTeamPlaybook`、`buildRoster`、`briefing` 的 delegation 增加 `reasoning_effort`（无则省略），`modelRouting` 增加 `effort`；花名册名字带 run 后缀，跨 run 不重名。
+- **提示词瘦身**：精简 `TOOL_DESCRIPTION`、`_stageDescription`（≤500 字）、`_spawnPrompt`（≤400 字）、`buildPolicy`（Lead ≤3/4 行、队员 ≤3 行，去掉 `wait_agent` 轮询表述、保留「回执」）；`record` 返回结构瘦身。
+- **面板**：设置新增「思考强度」页（默认策略 + 当前档位 + 生成 high·评审 medium·验证 low 预览、全局默认 select、8 角色覆盖表、按模型覆盖列表，模型不支持时显示「不支持思考强度」）。
+- **文档**：README 中英文档位表与思考强度章节同步；新增 [0.6 优化说明](docs/OPTIMIZATION-0.6.md)。
+
 ## [0.5.2] - 2026-11-16
 
 ### 安装后自动配置宿主（免手动勾选）

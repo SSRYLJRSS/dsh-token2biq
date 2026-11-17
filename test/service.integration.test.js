@@ -12,20 +12,17 @@ function mem() {
   return svc;
 }
 
-test('S1 全链路：生成→盲审→验证→裁决（内存 store）', () => {
+test('S1 全链路：生成→验证（S1 无独立评审阶段，内存 store）', () => {
   const svc = mem();
   const start = svc.start({ goal: '给函数加日志', mode: 'S1' });
   assert.equal(start.ok, true);
   assert.equal(start.run.mode, 'S1');
-  assert.deepEqual(start.stages.map((s) => s.kind), ['generate', 'review', 'verify']);
+  assert.deepEqual(start.stages.map((s) => s.kind), ['generate', 'verify']);
   const runId = start.run.id;
 
   const g = svc.record({ runId, stage: 'generate', role: 'worker', files: ['a.js'], diffSummary: '加了日志行', testsRun: ['node --test'], tokensIn: 1000, tokensOut: 500 });
   assert.equal(g.ok, true);
   assert.equal(g.paused, false);
-
-  const rv = svc.record({ runId, stage: 'review', role: 'reviewer', verdict: 'PASS', evidence: ['diff 合理'], tokensIn: 300, tokensOut: 100 });
-  assert.equal(rv.ok, true);
 
   const vf = svc.record({ runId, stage: 'verify', role: 'verifier', verdict: 'PASS', evidence: ['node --test 通过'], tokensIn: 200, tokensOut: 50 });
   assert.equal(vf.ok, true);
@@ -36,7 +33,7 @@ test('S1 全链路：生成→盲审→验证→裁决（内存 store）', () =>
 
   const st = svc.state(runId);
   assert.equal(st.current.verdict.final, 'PASS');
-  assert.equal(st.current.ledger.spent, 1000 + 500 + 300 + 100 + 200 + 50);
+  assert.equal(st.current.ledger.spent, 1000 + 500 + 200 + 50);
   assert.equal(st.current.stages.find((s) => s.kind === 'generate').tasks.length, 1);
 });
 
@@ -86,17 +83,17 @@ test('导出报告含目标与台账', () => {
   assert.match(md, /Token 台账/);
 });
 
-test('start(S3) 返回团队执行手册 playbook', () => {
+test('start(S3) 返回团队执行手册 playbook（默认核心 5 阶段）', () => {
   const svc = mem();
   const start = svc.start({ goal: '重构整个项目架构并迁移多文件模块', mode: 'S3' });
   assert.equal(start.run.mode, 'S3');
   assert.ok(start.playbook && Array.isArray(start.playbook.steps));
-  assert.equal(start.playbook.steps.length, 7);
+  assert.equal(start.playbook.steps.length, 5);
   assert.deepEqual(start.playbook.steps.map((s) => s.kind),
-    ['research', 'plan', 'generate', 'review', 'judge', 'redteam', 'regression']);
+    ['research', 'plan', 'generate', 'review', 'regression']);
   assert.equal(start.playbook.maxMembers, 8);
   assert.deepEqual(start.playbook.steps.map((s) => s.role),
-    ['researcher', 'planner', 'worker', 'reviewer', 'judge', 'red-team', 'verifier']);
+    ['researcher', 'planner', 'worker', 'reviewer', 'verifier']);
 });
 
 test('S3 非代码阶段（research/plan/judge/redteam）免 files 即可记录', () => {
@@ -125,7 +122,7 @@ test('record 持久化 teamTaskId / owner 并与任务板对应', () => {
   assert.equal(task.owner, 'worker-1');
 });
 
-test('闸门升级是真升级：S2 连续 2 次 FAIL 后 arch 变为 S3 且补足阶段', () => {
+test('闸门升级是真升级：S2 连续 2 次 FAIL 后 arch 变为 S3 且补足核心阶段', () => {
   const svc = mem();
   const runId = svc.start({ goal: '重构系统', mode: 'S2' }).run.id;
   svc.record({ runId, stage: 'generate', files: ['a.js'], diffSummary: 'v1' });
@@ -134,11 +131,11 @@ test('闸门升级是真升级：S2 连续 2 次 FAIL 后 arch 变为 S3 且补�
   assert.ok(f2.escalate);
   assert.equal(f2.escalate.from, 'S2');
   assert.equal(f2.escalate.to, 'S3');
-  assert.deepEqual(f2.escalate.addedStages, ['research', 'judge', 'redteam', 'regression']);
+  assert.deepEqual(f2.escalate.addedStages, ['research', 'regression']);
   const st = svc.state(runId);
   assert.equal(st.current.mode, 'S3');
   assert.deepEqual(st.current.stages.map((s) => s.kind).slice().sort(),
-    ['generate', 'judge', 'plan', 'redteam', 'regression', 'research', 'review', 'verify'].sort());
+    ['generate', 'plan', 'regression', 'research', 'review', 'verify'].sort());
 });
 
 test('action=map 只返回团队手册', () => {

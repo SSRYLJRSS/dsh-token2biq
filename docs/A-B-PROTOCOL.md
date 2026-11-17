@@ -20,7 +20,7 @@
 - 任务池：≥ **12 个** 真实开发任务，按难度分层（小=单文件、中=多文件、大=架构/迁移），每层 ≥4 个。
 - 每个任务跑 **两个臂（arm）**：
   - **对照组 C**：官方 Agent Teams 裸跑（不启插件，或插件 `pipelineGate=off` 且不起团队）。
-  - **实验组 T**：插件 `pipelineGate=strict` + `forceTeam=on` + `independentReview=on` + `requireDifferentVendor=on`，`candidates=1`（高风险大任务可 `candidates=3`）。
+  - **实验组 T**：插件 `pipelineGate=strict` + `forceTeam=on` + `independentReview=on`，`candidates=1`（高风险大任务可 `candidates=3`）。
 - **顺序配平**：每个任务随机决定先 C 还是先 T，抵消学习/缓存效应。
 - **隔离**：一个任务一个**全新会话**，同一模型、同一仓库、同一初始 commit；每轮开始前 `git reset --hard <base>` 并清缓存依赖。
 

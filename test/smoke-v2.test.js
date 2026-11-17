@@ -70,12 +70,12 @@ test('GET /token2biq/settings 返回设置；POST 可改并持久化', async () 
   assert.equal(r1.status, 200);
   assert.equal(JSON.parse(r1.body).settings.forceTeam, 'auto');
 
-  const r2 = await callRoute(captured.handler, { method: 'POST', url: '/token2biq/settings', body: { forceTeam: true, defaultMode: 'S2', roleModels: { review: 'a::b' } }, headers: { 'content-type': 'application/json' } });
+  const r2 = await callRoute(captured.handler, { method: 'POST', url: '/token2biq/settings', body: { forceTeam: true, defaultMode: 'S2', rolePools: { review: ['a::b'] } }, headers: { 'content-type': 'application/json' } });
   assert.equal(r2.status, 200);
   const s2 = JSON.parse(r2.body).settings;
   assert.equal(s2.forceTeam, 'on');
   assert.equal(s2.defaultMode, 'S2');
-  assert.equal(s2.roleModels.review, 'a::b');
+  assert.deepEqual(s2.rolePools.review, ['a::b']);
 
   // 重新装载应读到持久化值
   const { ctx: ctx2 } = makeCtx();

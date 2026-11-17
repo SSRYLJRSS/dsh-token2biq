@@ -4,42 +4,43 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 const src = readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8')
-  .replace('__components: { RunItem, RunList, Header }', '__components: { RunItem, RunList, Header, SettingsForm, DockControl, PanelApp }');
+  .replace('__components: { RunItem, RunList, Header, SettingsForm, SettingsView, DockControl, PanelApp }', '__components: { RunItem, RunList, Header, SettingsForm, SettingsView, DockControl, PanelApp }');
 const tick = () => new Promise(resolve => setImmediate(resolve));
 function harness(component, fetcher, owner = {sessionId:'session-a'}) {
   const values = [], refs = [], effects = [], callbacks = [];
   let cursor = 0, pending = [], captured, tree, props = {owner};
   const storage = new Map();
   const React = {
-    createElement: (type, props, ...children) => ({type, props:props || {}, children:children.flat(Infinity)}),
+    createElement: (type, props, ...children) => { const p = props || {}; if (!('children' in p)) p.children = children.flat(Infinity); return {type, props:p, children:children.flat(Infinity)}; },
     useState(init) { const i=cursor++; if (!(i in values)) values[i]=typeof init==='function'?init():init; return [values[i],v=>{values[i]=typeof v==='function'?v(values[i]):v;}]; },
     useRef(init) { const i=cursor++; return refs[i] || (refs[i]={current:init}); },
     useCallback(fn,deps) { const i=cursor++; const prev=callbacks[i]; if(!prev || deps.some((d,n)=>d!==prev.deps[n])) callbacks[i]={fn,deps}; return callbacks[i].fn; },
     useEffect(fn,deps) { const i=cursor++; const prev=effects[i]; if(!prev || deps.some((d,n)=>d!==prev.deps[n])) pending.push(()=>{prev?.cleanup?.(); effects[i]={deps,cleanup:fn()};}); },
   };
+  const expand = (n) => { if (!n || typeof n !== 'object') return n; if (typeof n.type === 'function') return expand(n.type(n.props)); return {...n, children:(n.children||[]).map(expand)}; };
   const noop=()=>{};
   const window={__ModuleLoader__:{load:v=>captured=v},confirm:()=>true,addEventListener:noop,removeEventListener:noop,innerHeight:800,innerWidth:1200};
   vm.runInNewContext(src,{window,document:{baseURI:'http://localhost/',visibilityState:'visible',addEventListener:noop,removeEventListener:noop},localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v)},fetch:fetcher,URL,console,setTimeout,clearTimeout,setInterval:()=>1,clearInterval:noop});
   const mod=captured.factory(id=>{if(id==='react')return React;throw Error(id);});
-  const render=(next)=>{if(next)props=next;cursor=0;tree=mod.__components[component](props);const q=pending;pending=[];q.forEach(f=>f());return tree;};
+  const render=(next)=>{if(next)props=next;cursor=0;tree=mod.__components[component](props);if(component==='SettingsForm')tree=expand(tree);const q=pending;pending=[];q.forEach(f=>f());return tree;};
   const nodes=(n=tree)=>n && typeof n==='object' ? [n,...(n.children||[]).flatMap(x=>nodes(x))] : [];
   const text=(n=tree)=>typeof n==='string'?n:typeof n==='number'?String(n):(n?.children||[]).map(text).join('');
   return {render,nodes,text,find:t=>nodes().find(n=>text(n)===t&&typeof n.props.onClick==='function'),storage};
 }
 const response = data => ({ok:true,status:200,json:async()=>data});
-const draft={normalModel:'p::normal',strongModel:'p::strong',rolePools:{research:['p::strong'],review:['p::normal','p::strong']},defaultMode:'Auto'};
+const draft={rolePools:{research:['p::strong'],review:['p::normal','p::strong']},defaultMode:'Auto',forceTeam:'auto',parallelReviews:3,pipelineGate:'off',independentReview:false};
 function settingsFetch(url,opts) { if(opts?.method==='POST')return Promise.resolve(response({ok:true,settings:JSON.parse(opts.body)})); return Promise.resolve(response(url.includes('models')?{models:[{ref:'p::normal',id:'p::normal'},{ref:'p::strong',id:'p::strong'}]}:{settings:structuredClone(draft)})); }
 
-test('custom opens manual configuration without rewriting any role pool',async()=>{
+test('V3 settings view renders both role pools and all eight roles',async()=>{
  const h=harness('SettingsForm',settingsFetch);h.render();await tick();h.render();
- const before=h.text();h.find('✓ 自定义').props.onClick();h.render();
- assert.ok(h.text().includes('2.p::strong'),'review pool must keep both models');
- assert.ok(h.text().includes('当前：自定义'));
- assert.ok(before.includes('2.p::strong'));
+ assert.ok(h.text().includes('模型'));
+ assert.ok(h.text().includes('p::normal、p::strong'),'review pool must keep both models');
+ for (const name of ['研究','计划','生成','评审','裁决','验证','红队','回归']) assert.ok(h.text().includes(name), 'missing role '+name);
+ assert.ok(h.text().includes('跟随主对话'));
 });
 test('HTTP 200 business failure never reports settings saved',async()=>{
  const h=harness('SettingsForm',(u,o)=>o?.method==='POST'?Promise.resolve(response({ok:false,error:'write denied'})):settingsFetch(u,o));h.render();await tick();h.render();await h.find('保存设置').props.onClick();h.render();
- assert.ok(!h.text().includes('已保存，新运行立即生效'));assert.ok(h.text().includes('write denied'));
+ assert.ok(!h.text().includes('已保存，新运行立即生效'));assert.ok(h.text().includes('write denied'));assert.ok(h.text().includes('p::normal、p::strong'),'保存失败必须保留草稿');
 });
 test('server disabled preference wins over missing browser storage',async()=>{
  const h=harness('DockControl',async u=>response(u.includes('/session?')?{pref:{enabled:false,mode:'S3'}}:{mode:'Auto'}));h.render();await tick();h.render();assert.ok(h.text().includes('关闭'));
@@ -64,10 +65,13 @@ test('old session reply cannot overwrite a newer session',async()=>{
  let first;const h=harness('DockControl',u=>u.includes('session-a')?new Promise(r=>first=()=>r(response({pref:{enabled:true,mode:'S4'}}))):Promise.resolve(response({pref:{enabled:false,mode:'S1'}})));
  h.render();h.render({owner:{sessionId:'session-b'}});await tick();first();await tick();h.render();assert.ok(h.text().includes('关闭'));assert.ok(!h.text().includes('完整加强'));
 });
-test('saving only visible changes does not resend stale hidden settings',async()=>{
- let posted; const h=harness('SettingsForm',(u,o)=>{if(o?.method==='POST'){posted=JSON.parse(o.body);return Promise.resolve(response({ok:true,settings:{...draft,...posted}}));}return settingsFetch(u,o);});
- h.render();await tick();h.render();const normal=h.nodes().find(n=>n.type==='select'&&n.props.value==='p::normal');normal.props.onChange({target:{value:'p::strong'}});h.render();await h.find('保存设置').props.onClick();
- assert.equal(posted.normalModel,'p::strong');assert.ok(!('allowModels' in posted));assert.ok(!('reviewModels' in posted));assert.ok(!('rolePools' in posted));assert.ok(!('roleModels' in posted));
+test('V3 save always sends eight rolePools keys and five advanced fields, never old fields',async()=>{
+ let posted; const h=harness('SettingsForm',(u,o)=>{if(o?.method==='POST'){posted=JSON.parse(o.body);return Promise.resolve(response({ok:true,settings:JSON.parse(o.body)}));}return settingsFetch(u,o);});
+ h.render();await tick();h.render();h.find('高级').props.onClick();h.render();const sel=h.nodes().find(n=>n.type==='select'&&n.props.id==='t2biq-v3-parallel-reviews');sel.props.onChange({target:{value:'5'}});h.render();assert.ok(h.text().includes('有未保存更改'),'修改后应显示脏状态');await h.find('保存设置').props.onClick();await tick();h.render();
+ assert.equal(posted.parallelReviews,5);
+ assert.deepEqual(Object.keys(posted.rolePools).sort(),['generate','judge','plan','redteam','regression','research','review','verify']);
+ for (const key of ['defaultMode','forceTeam','parallelReviews','pipelineGate','independentReview']) assert.ok(key in posted, key+' missing');
+ for (const key of ['roleModels','allowModels','strongModel','normalModel','reviewModels','maxReviewers','requireDifferentVendor']) assert.ok(!(key in posted), key+' must not be posted');
 });
 test('old run detail completion cannot replace newer selection while verdict backfill awaits',async()=>{
  let backfill;const h=harness('PanelApp',u=>u.includes('runId=old')?new Promise(r=>backfill=()=>r(response({current:{verdict:{final:'PASS'}}}))):Promise.resolve(response(u.includes('runId=new')?{runs:[{id:'new',verdict:'PASS'}],current:{id:'new'}}:{runs:[{id:'old'}],current:{id:'old'}})));

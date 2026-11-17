@@ -26,7 +26,7 @@
 
 ## 策略不等于运行时承诺
 
-S1 为 generate/review/verify；S2 增加 plan；S3/S4 为 research/plan/generate/review/judge/redteam/regression。S4 的角色池可产生多个评审执行位置。阶段内并行与阶段间依赖是不同概念：下游必须等待上游整组完成，不能仅依赖最后一个评审。
+S1 为 generate→verify；S2 为 plan→generate→review→verify；S3 核心为 research→plan→generate→review→regression（risk=high/strict 追加 judge/redteam）；S4 为完整 7 阶段（research/plan/generate/review/judge/redteam/regression，仅 review 双路并行）。S4 的角色池可产生多个评审执行位置。阶段内并行与阶段间依赖是不同概念：下游必须等待上游整组完成，不能仅依赖最后一个评审。
 
 reviewRounds 当前是计划元数据，并没有自动执行相应轮数的调度循环。不能将其显示或描述为已经完成的互审轮数。maxAgents 是派活规划上限，不能替代宿主对实际并发数的控制。costWeight 是相对权重，不是费用报价。
 

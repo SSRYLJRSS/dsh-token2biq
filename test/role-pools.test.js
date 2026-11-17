@@ -24,10 +24,10 @@ test('normalizeSettings: rolePools 多值保留，roleModels[k] 取池首项', (
   assert.equal(s.roleModels.generate, 'g::gen');
 });
 
-test('normalizeSettings: allowModels 默认 []，reviewModels 归一置空', () => {
+test('normalizeSettings: allowModels 默认 []，旧 reviewModels 不返回', () => {
   const s = normalizeSettings({});
   assert.deepEqual(s.allowModels, []);
-  assert.deepEqual(s.reviewModels, []);
+  assert.equal('reviewModels' in s, false);
 });
 
 test('旧 reviewModels 迁移进评审类角色池（排序后），roleModels=首项', () => {

@@ -40,7 +40,7 @@ function harness(t, options = {}) {
 
 test('start and settings never grant catalog routes or append official authorization', async t => {
   const h = harness(t);
-  await h.tool.execute({ action: 'settings', settings: { roleModels: { generate: 'custom::model' } } }, { agent: h.agent });
+  await h.tool.execute({ action: 'settings', settings: { rolePools: { generate: ['custom::model'] } } }, { agent: h.agent });
   await h.tool.execute({ action: 'start', mode: 'S1', goal: 'test' }, { agent: h.agent });
   assert.deepEqual(h.events.filter(e => e[0] === 'subagent/model-selection-policy'), []);
 });

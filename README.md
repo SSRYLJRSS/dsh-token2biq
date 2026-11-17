@@ -9,7 +9,7 @@
 
 [![GitHub](https://img.shields.io/badge/GitHub-SSRYLJRSS%2Fdsh--token2biq-181717?logo=github)](https://github.com/SSRYLJRSS/dsh-token2biq)
 [![CI](https://github.com/SSRYLJRSS/dsh-token2biq/actions/workflows/ci.yml/badge.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-v0.5.1-3B82F6.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
+[![Version](https://img.shields.io/badge/version-v0.6.1-3B82F6.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
 [![Releases](https://img.shields.io/github/v/release/SSRYLJRSS/dsh-token2biq?display_name=tag&color=3B82F6)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-3B82F6.svg)](LICENSE)
 [![DSH](https://img.shields.io/badge/DSH-%3E%3D0.2.0--rc.1%20%3C0.3.0-10B981.svg)](https://github.com/deepseek-ai/deepseek-harness)
@@ -31,7 +31,7 @@ DSH 的 Agent Teams 已经解决了「**能不能多代理协作**」——`suba
 | 没有编排层时 | Token 2b IQ 提供 |
 | --- | --- |
 | 不知道**该开几个代理、分几个阶段、审几轮**，全凭手感 | 用 **S1–S4 / Auto 档位**把「参与角色与阶段数量」变成粗粒度旋钮 |
-| 做的人和判的人是同一个，**自己批自己** | 阶段化流水线 + **独立盲审 / 跨厂商评审**（可硬校验） |
+| 做的人和判的人是同一个，**自己批自己** | 阶段化流水线 + **独立盲审**（可硬校验） |
 | 花了多少 token、走到哪一步、为什么失败，**说不清** | 每阶段 **回执 + token 台账 + 运行看板**，可导出 Markdown 报告 |
 | 复杂任务容易「一把梭」直接交付，**没有验证闸门** | 可选 `pipelineGate=strict`：无验收标准不进实现、无 `testsRun` 不许收尾 |
 
@@ -146,7 +146,7 @@ start ──► spawn/send ──► 队员执行 ──► record（带 teamTas
 | `review` / `judge` / `redteam` 裁判 | `verdict`(PASS\|FAIL)，FAIL 必填 `issues[]` |
 | `verify` / `regression` 验证 | `verdict`，FAIL 必填 `evidence[]`；strict 下须带非空 `testsRun` |
 
-`record` 还可以带 `tokensIn / tokensOut`（可选，缺省按字符估算）与 `model`（`provider::model`，用于白名单 / 跨厂商硬校验）。
+`record` 还可以带 `tokensIn / tokensOut`（可选，缺省按字符估算）与 `model`（`provider::model`，用于白名单硬校验）。
 
 ### 其它动作
 
@@ -158,17 +158,35 @@ start ──► spawn/send ──► 队员执行 ──► record（带 teamTas
 
 ### 4 档位（这是控制 token 消耗的粗粒度手段，不设硬预算）
 
-| 档位 | 参与代理上限 | 阶段流程 | 建议互审轮数 | 相对成本权重 |
-| --- | ---: | --- | ---: | ---: |
-| **S1 轻量** | 1 | generate → review → verify | 1 | ×2 |
-| **S2 标准** | 3 | plan → generate → review → verify | 3 | ×5 |
-| **S3 完整** | 6 | research → plan → generate → review → judge → redteam → regression | 3 | ×10 |
-| **S4 完整加强** | 8 | 同 S3，但评审/裁决/红队按角色池**多候选并行多审**（任一 FAIL 即该阶段 FAIL） | 3 | ×16 |
-| **Auto 自动** | — | 关键词先筛 → 拿不准用低思考模型复核 → 失败回退关键词 | — | — |
+| 档位 | 参与代理上限 | 阶段流程 | 相对成本权重 |
+| --- | ---: | --- | ---: |
+| **S1 轻量** | 1 | generate → verify（2 阶段，1 代理） | ×2 |
+| **S2 标准** | 3 | plan → generate → review → verify（4 阶段） | ×5 |
+| **S3 完整** | 5 | 核心 5 阶段：research → plan → generate → review → regression；高风险追加 judge / redteam（完整 7 阶段） | ×10 |
+| **S4 完整加强** | 8 | 完整 7 阶段：research → plan → generate → review → judge → redteam → regression；评审双路并行（review 由两个独立模型并行盲审，任一 FAIL 即该阶段 FAIL） | ×16 |
+| **Auto 自动** | — | 关键词先筛 → 拿不准用低思考模型复核 → 失败回退关键词 | — |
 
 > 0.5.0 起提供**成本闸门**（`settings.tokenBudget`，0=不限）：消耗到 80% 时面板与 `action=state` 提示收敛，到 100% 时熔断——不再新建任务，由 Lead 用现有回执收口。它只拦「新建」，不会掐断已完成的工作。日常仍用「档位 = 参与角色数」做粗粒度控制。
 
-`reviewRounds` 是执行手册的建议轮数，不是自动追加评审任务的保证；实际完成的评审以任务板和回执为准。
+> S3 的 judge / redteam 是**高风险追加阶段**：`start` 传 `risk: "high"`（或 `strict`）才进入；`regression` 属核心阶段，始终执行，普通任务只跑核心 5 阶段。S4 的「评审双路」指同一 `review` 阶段由两个独立模型并行盲审，任一 FAIL 即该阶段 FAIL；其余阶段不并行。
+
+### 思考强度（reasoning effort）
+
+每个阶段真正调用模型时，除了「用哪个模型」，还能决定「想多深」。默认策略是 **auto**：不给具体档，按「档位 × 角色」矩阵自动取。
+
+- **默认 auto 矩阵**（`settings.reasoning.default = "auto"`）。未在角色/模型上覆盖时，按档位与角色查表（`MODE_ROLE_EFFORT`）：
+
+| 档位 | 研究 | 计划 | 生成 | 评审 | 裁决 | 红队 | 验证 | 回归 | 其它(默认) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| S1 | — | — | high | high | — | — | high | — | high |
+| S2 | — | high | high | high | — | — | high | — | high |
+| S3 | high | high | high | high | xhigh | high | high | high | high |
+| S4 | high | xhigh | high | xhigh | xhigh | xhigh | high | high | high |
+
+- **按角色覆盖**：`settings.reasoning.byRole[<角色>]`，取值为 `off / minimal / low / medium / high / xhigh / max`（`auto` 表示不覆盖）。
+- **按模型覆盖**：`settings.reasoning.byModel["provider::model"]`，粒度到具体模型。
+- **优先级**：按模型 > 按角色 > 全局默认 `auto`（查矩阵）。可在面板「设置 → 思考强度」或 `token2biq action=settings` 的 `reasoning` 字段配置。
+- **模型思考强度能力**：解析优先读 `reasoning.supportedEfforts`（旧 `reasoning.efforts` 兜底）与 `reasoning.defaultEffort`。仅 `defaultEffort`、无可选档的旧模型会**省略** `reasoning_effort` 参数、照常调用、不报错（面板显示「仅默认 <档>」）；若首选档不在可选档内，按 `off → minimal → low → medium → high → xhigh → max` 顺序**向下就近降档**，再退回模型默认档。
 
 ### 四个零件
 
@@ -188,25 +206,24 @@ start ──► spawn/send ──► 队员执行 ──► record（带 teamTas
 - **运行记录**：每条一眼看到档位、这个档位额外做了什么、结论、token、时间；点开看阶段流程。
 - **概览统计（4 卡）**：运行数 / **真实 token（宿主 `llm/stream` 实时实测）** / **回执上报（含估算）** / 一次通过率；下方一行实时明细：输入 / 输出 / 缓存读 / 请求数。
 - **两个口径分开**：真实用量与回执上报**不混算**，避免把估算当真实。
-- **设置页**：默认档位 / 强制联动 / 按角色指定模型 / 评审模型池 / 必须不同厂商 / 流水线门禁，每项标注**真实生效范围**。
+- **设置页**：模型 / 思考强度 / 高级三页。模型页可单独指定 8 个角色（多人评审最多 5 个、按顺序取主模型），或全部「跟随主对话」；思考强度页配置全局默认、8 个角色覆盖与按模型覆盖；高级页管理默认档位、强制团队、S4 并行审模型数、严格流程和独立评委。
 
 ---
 
 ## 配置项（哪些硬生效，哪些只是建议）
 
-设置写在 `~/.dsh/token2biq/settings.json`，面板「设置」或 `token2biq action=settings` 修改。**请按「生效范围」列理解每一项**——不要以为标了「建议」的项会被插件拦截。
+设置写在 `~/.dsh/token2biq/settings.json`，面板「设置」或 `token2biq action=settings` 修改。**请按「生效范围」列理解每一项**——不要以为标了「建议」的项会被插件拦截。升级旧配置请看 [设置 V3 升级说明](docs/V3-UPGRADE.md)。
 
 | 配置 | 作用 | 生效范围 |
 | --- | --- | --- |
 | `defaultMode` | 新运行/新会话默认档位 | ✅ 硬生效 |
 | `forceTeam`（`auto`/`on`/`off`） | 是否要求每阶段都绑定共享任务与队员 | ✅ **硬校验**：开启时 `record` 缺 `teamTaskId`/`owner` 直接拒收。默认 `auto` = S2/S3/S4 强制 |
 | `allowModels` | 模型白名单 | ✅ **硬校验**：`record` 上报 `model` 且不在白名单 → 拒收（不上报则不判）。通过 `settings.json` 或 `action=settings` 配置（面板未内置白名单入口） |
-| `requireDifferentVendor` | 评审/裁判不得与生成同厂商 | ✅ **硬校验**：`record` 上报同厂商 `model` → 拒收（不上报则不判） |
 | `independentReview` | 评审/裁判/红队必须由非执行者盲审 | ✅ **硬校验**：`owner` 不能是本次 generate 执行者（自评拒收） |
 | `tokenBudget` | 每运行 token 预算（`0`=不限） | ✅ **硬生效**：≥80% 提示收敛，≥100% 熔断——不再新建任务，由 Lead 用现有回执收口 |
 | `pipelineGate`（`off`/`strict`） | 严格流水线硬门禁 | ✅ **硬校验**：见下 |
-| `rolePools` / `roleModels`（按角色指定模型） | 每阶段用哪个模型 | ⚠️ **建议**：写进执行手册，插件不强制切换 |
-| `reviewModels` / `maxReviewers` / `parallelReviews` | 评审池轮转、多审数量 | ⚠️ **建议**：写进手册，由 Lead 用 subagent 落地 |
+| `rolePools`（按角色指定模型） | 每阶段用哪个模型；8 个 key 永远存在，空数组=跟随主对话；数组顺序即优先级 | ⚠️ **建议**：写进执行手册，插件不强制切换。`roleModels` 是只读派生字段（池首项），不会落盘 |
+| `parallelReviews`（S4 并行审模型数） | 完整加强 S4 的 `review` 阶段并行盲审数（1..5，实际最多 2 路） | ⚠️ **建议**：写进执行手册，由 Lead 用 subagent 落地；实际并行数 = min(该值, 已选模型数, 2) |
 | 档位 / 阶段流程 | 参与角色与阶段数量 | ⚠️ **强提示**：注入系统提示 + 手册 + `record` 记账约束，但**不是内核级硬拦截**每一步工具调用 |
 
 ### `pipelineGate=strict` 到底硬在哪
@@ -224,10 +241,10 @@ start ──► spawn/send ──► 队员执行 ──► record（带 teamTas
 这一节是刻意写下来的，避免你带着错误预期安装它：
 
 1. **档位是「强提示 + 记账硬门禁」，不是内核级硬拦截。** 插件通过系统提示、执行手册和 `record` 校验来推动流程；它无法拦截 agent 的每一次工具调用。模型仍可能不按 roster 走，真正的执行一致性依赖官方 Agent Teams 的规范用法。
-2. **模型路由阶段必须由 Lead 用 `subagent` 执行。** `subagent` 可显式传 `provider/model`（`subagent_fork` 不支持模型选择）。所以凡是配置了模型的阶段，playbook 会明确要求 Lead 用 `subagent(provider/model)` 执行，并在 `record` 带回同一个 `model`，否则白名单/跨厂商校验无从生效。
+2. **模型路由阶段必须由 Lead 用 `subagent` 执行。** `subagent` 可显式传 `provider/model`（`subagent_fork` 不支持模型选择）。所以凡是配置了模型的阶段，playbook 会明确要求 Lead 用 `subagent(provider/model)` 执行，并在 `record` 带回同一个 `model`，否则白名单校验无从生效。
 3. **`pipelineGate` 默认 `off`，这是有 A/B 依据的。** 3 个自包含任务（小/中/大）× 2 臂，两臂均 3/3 通过、独立盲审 3/3 PASS、0 返工——严格流水线在小任务上**不提升正确率、只增加开销**。其价值待「生成者会犯错」的硬任务再验证。
 4. **「真实 token」是全进程口径，不是按队员精确归属。** 宿主 `llm/stream` 的 usage 分片不带 `runId`，插件只能把运行活跃期间**同进程**的调用都归到当前运行；同期的其他对话也可能被算进来。数值偏高于预期时，通常就是这个原因。
-5. **generate 默认串行（共享 cwd、无文件锁）。** 确需并行时，各任务 `writeScopes` 必须互不重叠；并行队员数按执行手册上限（默认 8）。
+5. **generate 默认串行（共享 cwd、无文件锁）。** 确需并行时，各任务 `writeScopes` 必须互不重叠；并行队员数按执行手册上限（S4 最多 8 个代理）。
 6. **`independentReview` 是 owner 校验，不是「插件自己跑一个指定模型的评委」。** 宿主没有同步「跑完并返回 verdict」的接口，插件不会自造 agent 运行时；如需异源评委，由 Lead 起独立子代理执行后回执。
 7. **真实端到端仍需重启验证。** 宿主 JS 只在启动时装载；install 返回 `restart-required`。
 8. **HTTP 路由已接官方 `ctx.connection.requestRejection`**（未信任 Host/Origin → 403，未认证 → 401），在其放行时再叠加 **Origin 白名单 + 强制 `application/json`**（缺失/非 JSON → 415），并有 `readJson` 1MB body 上限。
@@ -252,7 +269,7 @@ start ──► spawn/send ──► 队员执行 ──► record（带 teamTas
 看板有**两个口径**：`N tok` = 宿主实时实测（全进程归集，可能偏高）；`≈N tok（估算）` = 回执上报或字符估算（仅参考）。两者不混算。
 
 **Q：评审为什么老是被拒收？**
-多半是 `forceTeam`（S2/S3/S4 默认强制）要求 `record` 带 `teamTaskId`+`owner`，或 `requireDifferentVendor` 发现评审与生成同厂商。按提示补字段或调设置即可。
+多半是 `forceTeam`（S2/S3/S4 默认强制）要求 `record` 带 `teamTaskId`+`owner`。按提示补字段或调设置即可。
 
 ---
 
@@ -285,11 +302,12 @@ start ──► spawn/send ──► 队员执行 ──► record（带 teamTas
 
 | 文档 | 内容 |
 | --- | --- |
-| [CHANGELOG.md](CHANGELOG.md) | 版本变更记录（当前 **0.5.1**） |
+| [CHANGELOG.md](CHANGELOG.md) | 版本变更记录（当前 **0.6.1**） |
+| [0.6 优化说明](docs/OPTIMIZATION-0.6.md) | 0.6.0 的档位重排、思考强度与提示词瘦身 |
 | [架构说明](docs/ARCHITECTURE.md) | 执行模型、模块职责与维护边界 |
 | [验证指南](docs/VERIFICATION.md) | 测试入口、验证范围与实测结果 |
 | [审查台账](docs/AUDIT-2026-11-16.md) | 本轮审查与修复验收记录 |
-| [GitHub Releases](https://github.com/SSRYLJRSS/dsh-token2biq/releases) | 发布说明与版本分发（`v0.5.1`） |
+| [GitHub Releases](https://github.com/SSRYLJRSS/dsh-token2biq/releases) | 发布说明与版本分发（`v0.6.1`） |
 
 ---
 

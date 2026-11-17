@@ -10,10 +10,9 @@ test('parseModelRef: 合法解析，非法返回 null', () => {
   }
 });
 
-test('collectModelRoutes: 汇总 rolePools/roleModels/目录，解析去重、顺序稳定、丢弃非法', () => {
+test('collectModelRoutes: 汇总 rolePools/目录，解析去重、顺序稳定、丢弃非法', () => {
   const routes = collectModelRoutes({
-    rolePools: { review: ['magpie::a', 'magpie::b'], judge: ['', 'nocolon'] },
-    roleModels: { generate: 'magpie::c', plan: 'x::' },
+    rolePools: { review: ['magpie::a', 'magpie::b'], generate: ['magpie::c'], judge: ['', 'nocolon'] },
     catalogGroups: [{ id: 'magpie', models: [{ id: 'a' }, { id: 'd' }] }],
   });
   assert.equal(routes.length, 4);
