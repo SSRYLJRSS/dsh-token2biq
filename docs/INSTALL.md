@@ -1,6 +1,6 @@
 # 安装与升级指南
 
-本文覆盖三条安装路径、常见失败原因和修复命令。目标版本：**0.6.2**，DSH 兼容范围 **>=0.2.2-rc.3 <0.3.0-0**。
+本文覆盖四条安装路径、常见失败原因和修复命令。目标版本：**0.6.2**，DSH 兼容范围 **>=0.2.2-rc.3 <0.3.0-0**。
 
 ## 1. 推荐：Desktop 插件市场
 
@@ -8,9 +8,24 @@
 2. 搜索 `dsh-token2biq`，点击安装。
 3. **完整退出 DSH**（不是只关窗口），再重新启动。
 
-市场安装的是**预构建 tarball**：包内零运行时依赖、没有安装脚本，因此不会触发 pnpm 的 `allowBuilds` 构建授权，也不需要本机编译。
+市场按注册表的 **GitHub 源**安装。包内零运行时依赖、没有 build 脚本；插件加载时会自动补好 Agent Teams 与子代理模型选择两项宿主配置，不需要本机编译。
 
-## 2. 命令行：预构建 tarball
+## 2. 命令行：GitHub 源
+
+```sh
+dsh plugin --profile desktop add github:SSRYLJRSS/dsh-token2biq
+```
+
+把 `desktop` 换成实际 profile 名（`dsh plugin --profile <name>`）。安装完成后同样要**完整重启 DSH**。
+
+验证：
+
+```sh
+dsh plugin --profile desktop why dsh-token2biq
+# 输出应显示 dsh-token2biq 0.6.2 及其来源 GitHub
+```
+
+## 3. 预构建 tarball（可选）
 
 ```sh
 # 固定版本（可复现，推荐）
@@ -20,16 +35,9 @@ dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/rele
 dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/latest/download/dsh-token2biq.tgz
 ```
 
-把 `desktop` 换成实际 profile 名（`dsh plugin --profile <name>`）。安装完成后同样要**完整重启 DSH**。
+> 包内零依赖、无安装脚本，不需要 `allowBuilds`。若报 `UNABLE_TO_VERIFY_LEAF_SIGNATURE`，说明本机 Node 不信任 GitHub Release 的证书链：改用第 2 节的 GitHub 源，或在启动 DSH 前设置 `NODE_OPTIONS=--use-system-ca`。
 
-验证：
-
-```sh
-dsh plugin --profile desktop why dsh-token2biq
-# 输出应显示 dsh-token2biq 0.6.2 及其来源 tarball
-```
-
-## 3. 源码 link：仅开发/排障
+## 4. 本地源码 link：仅开发/排障
 
 ```sh
 git clone https://github.com/SSRYLJRSS/dsh-token2biq.git
@@ -69,11 +77,11 @@ macOS / Linux：
 rm -f ~/.dsh/profiles/desktop/node_modules/dsh-token2biq
 ```
 
-然后重新在插件市场点安装，或执行上面的 `dsh plugin add <tarball>`。
+然后重新在插件市场点安装，或执行上面的 GitHub 源 / tarball 安装命令。
 
 ## 常见失败 2：GitHub 源码安装报 ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED
 
-pnpm 11 对 git 依赖默认不执行 `prepare` 构建脚本。DSH 插件管理器会把它记成待授权的 `allowBuilds` 项。按插件管理器提示允许构建即可；也可以改用**预构建 tarball**，完全绕过构建授权。
+pnpm 11 对 git 依赖默认不执行 `prepare` 构建脚本。本包没有 build 脚本，通常不会触发；若插件管理器仍提示待授权的 `allowBuilds`，按提示允许构建即可，也可以改用**预构建 tarball** 绕过。
 
 ## 常见失败 3：安装成功但面板没出现
 

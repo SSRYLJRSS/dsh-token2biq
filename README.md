@@ -70,9 +70,17 @@ flowchart LR
 
 在 **DeepSeek Harness Desktop → 设置 → 插件** 里搜索 `dsh-token2biq`，一键安装。装完**完整退出并重启** DSH。
 
-> 市场安装使用预构建 tarball（零依赖、无安装脚本），不会触发 pnpm 的 `allowBuilds` 构建授权。
+> 市场按注册表的 GitHub 源安装。本包零运行时依赖、没有 build 脚本；插件加载时会自动补好 Agent Teams 与子代理模型选择两项宿主配置。
 
-### 方式二：`dsh plugin` 命令行（预构建，推荐）
+### 方式二：`dsh plugin` 命令行（GitHub 源，推荐）
+
+```sh
+dsh plugin --profile desktop add github:SSRYLJRSS/dsh-token2biq
+```
+
+> 这是与插件市场相同的安装源。把 `desktop` 换成实际 profile 名（如 `web`）。若网络只能直连 GitHub Release，可改用方式三的预构建 tarball。
+
+### 方式三：预构建 tarball（可选）
 
 ```sh
 # 固定版本（可复现）
@@ -82,9 +90,9 @@ dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/rele
 dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/latest/download/dsh-token2biq.tgz
 ```
 
-> 把 `desktop` 换成实际 profile 名（如 `web`）。
+> 包内零依赖、无安装脚本，不需要 `allowBuilds`。若报 `UNABLE_TO_VERIFY_LEAF_SIGNATURE`，说明本机 Node 不信任 GitHub Release 的证书链：改用方式二，或在启动 DSH 前设置 `NODE_OPTIONS=--use-system-ca`。
 
-### 方式三：从 GitHub 源码（仅开发/排障）
+### 方式四：本地源码 link（仅开发/排障）
 
 ```sh
 git clone https://github.com/SSRYLJRSS/dsh-token2biq.git

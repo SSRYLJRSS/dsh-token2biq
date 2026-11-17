@@ -48,9 +48,17 @@ Token 2b IQ is **not** another agent runtime. It sits on top of the official Age
 
 Open **DeepSeek Harness Desktop → Settings → Plugins**, search `dsh-token2biq`, and click Install. **Fully quit and restart DSH** afterwards.
 
-> The market installs the prebuilt tarball (zero dependencies, no install scripts), so it never triggers pnpm's `allowBuilds` build approval.
+> The market installs from the registry's GitHub source. The package has zero runtime dependencies and no build scripts; on load it provisions the Agent Teams and subagent model-selection host settings.
 
-### 2) `dsh plugin` CLI (prebuilt, recommended)
+### 2) `dsh plugin` CLI (GitHub source, recommended)
+
+```sh
+dsh plugin --profile desktop add github:SSRYLJRSS/dsh-token2biq
+```
+
+> Same source the market uses. Replace `desktop` with your profile name (e.g. `web`). If your network can only reach GitHub Releases, use the prebuilt tarball in option 3.
+
+### 3) Prebuilt tarball (optional)
 
 ```sh
 # Pinned version (reproducible)
@@ -60,9 +68,9 @@ dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/rele
 dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/latest/download/dsh-token2biq.tgz
 ```
 
-> Replace `desktop` with your profile name (e.g. `web`).
+> Zero dependencies, no install scripts, so no `allowBuilds` approval. If you hit `UNABLE_TO_VERIFY_LEAF_SIGNATURE`, Node does not trust the GitHub Release certificate chain: use option 2, or set `NODE_OPTIONS=--use-system-ca` before launching DSH.
 
-### 3) From GitHub source (development/troubleshooting only)
+### 4) Local source link (development/troubleshooting only)
 
 ```sh
 git clone https://github.com/SSRYLJRSS/dsh-token2biq.git
