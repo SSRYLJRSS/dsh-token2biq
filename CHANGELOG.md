@@ -1,5 +1,16 @@
 # 变更日志
 
+## [0.6.2] - 2026-11-17
+
+### 安装链路修复 + 版本声明 + 市场/Release 全面更新
+
+- 版本 `0.6.1` → `0.6.2`；DSH 兼容范围改为 `>=0.2.2-rc.3 <0.3.0-0`（按插件实际使用的 Agent Teams / subagents 接口下限声明），并同时写入顶层 `engines.dsh` 与 `dsh.compatibility.dsh`。市场与宿主现在都能直接识别版本与兼容性，不再显示“无版本声明 / 兼容未知”。
+- **修复市场/云端安装一直卡住**：根因是此前 `link:` 本地安装留下的 `node_modules/dsh-token2biq` 目录联接（junction）；pnpm 11 在 import 阶段执行 `rename(dsh-token2biq_tmp_* -> dsh-token2biq)` 时抛 `ERR_PNPM_EPERM`，桌面端安装操作会一直停在“安装中”。README 已补充诊断与一键清理 junction 的命令；市场登记改为预构建 tarball，不再走 GitHub 源码构建。
+- **预构建 tarball 分发**：Release 同时提供 `dsh-token2biq-0.6.2.tgz`（固定版本，注册表 pin 用）与 `dsh-token2biq.tgz`（version-free，供 `latest/download` 使用）；包内零运行时依赖、无安装脚本，`dsh plugin add <tarball>` 不需要 `allowBuilds` 授权。
+- **自动配置复核**：`agent-team`（`defaultEnabled: true`、`maxTasks: 256`）与 `subagent-model-selection-settings`（`enabled: true` + 全量 `allowedModels`）已在真实 DSH 0.2.2-rc.3 + Desktop profile 验证生效；继续保证只追加 profile `cordis.patch.yml`、绝不改 `settings.yaml`、已有同 id 配置不覆盖、写前备份 / 原子写 / 写后校验 / 失败回滚。
+- **测试**：新增 `test/manifest.test.js` 锁定版本、`engines.dsh` / `dsh.compatibility.dsh`、bundle patch 与发布 payload；`npm run ci` 与 `npm run test:smoke` 全量通过。
+- **文档**：README / README.en 安装章节按“市场预构建 → CLI 预构建 → 源码开发”重写，补充 junction 清理、版本与兼容声明、Release 双资产与市场 tarball 说明。
+
 ## [0.6.1] - 2026-11-17
 
 ### 真实宿主思考强度修复 + 高地板矩阵 + 载荷瘦身

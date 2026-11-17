@@ -1,0 +1,104 @@
+# 安装与升级指南
+
+本文覆盖三条安装路径、常见失败原因和修复命令。目标版本：**0.6.2**，DSH 兼容范围 **>=0.2.2-rc.3 <0.3.0-0**。
+
+## 1. 推荐：Desktop 插件市场
+
+1. 打开 **DeepSeek Harness Desktop → 设置 → 插件**。
+2. 搜索 `dsh-token2biq`，点击安装。
+3. **完整退出 DSH**（不是只关窗口），再重新启动。
+
+市场安装的是**预构建 tarball**：包内零运行时依赖、没有安装脚本，因此不会触发 pnpm 的 `allowBuilds` 构建授权，也不需要本机编译。
+
+## 2. 命令行：预构建 tarball
+
+```sh
+# 固定版本（可复现，推荐）
+dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/download/v0.6.2/dsh-token2biq-0.6.2.tgz
+
+# 或始终取最新 release
+dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/latest/download/dsh-token2biq.tgz
+```
+
+把 `desktop` 换成实际 profile 名（`dsh plugin --profile <name>`）。安装完成后同样要**完整重启 DSH**。
+
+验证：
+
+```sh
+dsh plugin --profile desktop why dsh-token2biq
+# 输出应显示 dsh-token2biq 0.6.2 及其来源 tarball
+```
+
+## 3. 源码 link：仅开发/排障
+
+```sh
+git clone https://github.com/SSRYLJRSS/dsh-token2biq.git
+dsh plugin --profile desktop add link:/absolute/path/to/dsh-token2biq
+```
+
+`link:` 会在 profile 的 `node_modules/dsh-token2biq` 创建一个**目录联接（junction）**。这适合本地改代码，但会挡住后续的市场/云端安装。
+
+## 常见失败 1：安装一直停在“安装中”
+
+日志位置：
+
+```
+%USERPROFILE%\.dsh\profiles\<profile>\.plugin-manager\logs\operation-*\pnpm.log
+```
+
+如果看到：
+
+```
+[ERR_PNPM_EPERM] [importPackage ...\node_modules\dsh-token2biq]
+EPERM: operation not permitted, rename
+'...\dsh-token2biq_tmp_<pid>_<n>' -> '...\dsh-token2biq'
+```
+
+说明 profile 里有一个旧的 `node_modules/dsh-token2biq` 目录联接，pnpm 无法用新目录覆盖它。**这不是网络问题，也不是包本身安装失败。**
+
+Windows 删除残留联接（只删链接，不删源码）：
+
+```powershell
+$p = "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-token2biq"
+if (Test-Path $p) { (Get-Item $p -Force).Delete() }
+```
+
+macOS / Linux：
+
+```sh
+rm -f ~/.dsh/profiles/desktop/node_modules/dsh-token2biq
+```
+
+然后重新在插件市场点安装，或执行上面的 `dsh plugin add <tarball>`。
+
+## 常见失败 2：GitHub 源码安装报 ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED
+
+pnpm 11 对 git 依赖默认不执行 `prepare` 构建脚本。DSH 插件管理器会把它记成待授权的 `allowBuilds` 项。按插件管理器提示允许构建即可；也可以改用**预构建 tarball**，完全绕过构建授权。
+
+## 常见失败 3：安装成功但面板没出现
+
+- 确认已**完整退出并重启 DSH**；宿主侧 JS 只在启动时加载。
+- 确认安装的是当前 profile：`dsh plugin --profile desktop why dsh-token2biq`。
+- 查看 `~/.dsh/logs/` 里的宿主日志，搜索 `[token2biq]`。
+
+## 版本与兼容声明
+
+- 包版本：`0.6.2`
+- `package.json` 顶层 `engines.dsh`：`>=0.2.2-rc.3 <0.3.0-0`
+- `package.json` 的 `dsh.compatibility.dsh`：同上
+- 市场与宿主优先读取 `engines.dsh`；如果缺失，会显示“无版本声明 / 兼容未知”
+
+## 自动配置宿主（安装后首次加载）
+
+插件加载时会向 profile 的 `cordis.patch.yml` 追加：
+
+- `- id: agent-team` → `config.defaultEnabled: true`、`maxTasks: 256`
+- `- id: subagent-model-selection-settings` → `config.enabled: true` + 从 `settings.yaml` 扫描到的 `allowedModels`
+
+安全边界：不改 `settings.yaml`；只追加；同 id 已有配置不覆盖；写前备份 `cordis.patch.yml.bak-token2biq-<时间戳>`；临时文件 + 原子替换 + 写后校验；失败回滚。修改后需重启 DSH 生效。
+
+## 回滚
+
+1. 在插件市场卸载，或 `dsh plugin --profile desktop remove dsh-token2biq`。
+2. 如需撤销自动配置，把最近的 `cordis.patch.yml.bak-token2biq-*` 复制回 `cordis.patch.yml`。
+3. 重启 DSH。

@@ -9,10 +9,10 @@
 
 [![GitHub](https://img.shields.io/badge/GitHub-SSRYLJRSS%2Fdsh--token2biq-181717?logo=github)](https://github.com/SSRYLJRSS/dsh-token2biq)
 [![CI](https://github.com/SSRYLJRSS/dsh-token2biq/actions/workflows/ci.yml/badge.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-v0.6.1-3B82F6.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
+[![Version](https://img.shields.io/badge/version-v0.6.2-3B82F6.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
 [![Releases](https://img.shields.io/github/v/release/SSRYLJRSS/dsh-token2biq?display_name=tag&color=3B82F6)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-3B82F6.svg)](LICENSE)
-[![DSH](https://img.shields.io/badge/DSH-%3E%3D0.2.0--rc.1%20%3C0.3.0-10B981.svg)](https://github.com/deepseek-ai/deepseek-harness)
+[![DSH](https://img.shields.io/badge/DSH-%3E%3D0.2.2--rc.3%20%3C0.3.0-10B981.svg)](https://github.com/deepseek-ai/deepseek-harness)
 [![awesome · DSH plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
 [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-6E56CF.svg)](https://github.com/topics/dsh-plugin)
 
@@ -68,25 +68,49 @@ flowchart LR
 
 ### 方式一：Desktop 插件市场（推荐）
 
-在 **DeepSeek Harness Desktop → 设置 → 插件** 里搜索 `dsh-token2biq`，一键安装。装完**完整重启** DSH。
+在 **DeepSeek Harness Desktop → 设置 → 插件** 里搜索 `dsh-token2biq`，一键安装。装完**完整退出并重启** DSH。
 
-### 方式二：`dsh plugin` 命令行
+> 市场安装使用预构建 tarball（零依赖、无安装脚本），不会触发 pnpm 的 `allowBuilds` 构建授权。
 
-```sh
-# 直接从 GitHub 源码安装（无需构建，本仓库即插件本身）
-dsh plugin --profile web add github:SSRYLJRSS/dsh-token2biq
-
-# 发布到 npm 后也可：dsh plugin --profile web add dsh-token2biq
-```
-
-> 把 `web` 换成你实际使用的 profile 名（如 `desktop`）。
-
-### 方式三：本地目录 link（开发者）
+### 方式二：`dsh plugin` 命令行（预构建，推荐）
 
 ```sh
-dsh plugin --profile desktop add link:./dsh-token2biq
-# 或在 DSH 仓库根用 plugin_manager install_bundle 安装本地包目录
+# 固定版本（可复现）
+dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/download/v0.6.2/dsh-token2biq-0.6.2.tgz
+
+# 或始终取最新版
+dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/latest/download/dsh-token2biq.tgz
 ```
+
+> 把 `desktop` 换成实际 profile 名（如 `web`）。
+
+### 方式三：从 GitHub 源码（仅开发/排障）
+
+```sh
+git clone https://github.com/SSRYLJRSS/dsh-token2biq.git
+dsh plugin --profile desktop add link:/absolute/path/to/dsh-token2biq
+```
+
+> `link:` 会在 profile 的 `node_modules/dsh-token2biq` 建目录联接（junction）。**切回市场/云端安装前必须先删掉它**，否则 pnpm 会在 import 阶段报 `ERR_PNPM_EPERM ... rename ... dsh-token2biq_tmp_... -> dsh-token2biq`，安装会一直卡住。
+
+Windows 删除残留联接（只删链接，不删源码）：
+
+```powershell
+$p = "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-token2biq"
+if (Test-Path $p) { (Get-Item $p -Force).Delete() }
+```
+
+macOS / Linux：
+
+```sh
+rm -f ~/.dsh/profiles/desktop/node_modules/dsh-token2biq
+```
+
+### 版本与兼容性
+
+- 包版本：`0.6.2`
+- DSH 兼容范围：`>=0.2.2-rc.3 <0.3.0-0`，同时写在 `package.json` 的 `engines.dsh` 与 `dsh.compatibility.dsh`
+- 市场与宿主读取 `engines.dsh` 判定兼容；不会再显示“无版本声明 / 兼容未知”
 
 ### ⚠️ 生效方式（重要）
 
@@ -277,6 +301,8 @@ start ──► spawn/send ──► 队员执行 ──► record（带 teamTas
 
 插件加载时会自动改好两处 DSH 宿主设置，装完**重启 DSH** 即生效：
 
+> 已在 DSH 0.2.2-rc.3 + Desktop profile 实测：两条都会写入；若已有同 id 条目则保持原样，不覆盖用户配置。
+
 | 自动写入 | 位置 | 效果 |
 | --- | --- | --- |
 | `- id: agent-team` → `defaultEnabled: true` | `~/.dsh/profiles/<profile>/cordis.patch.yml` | 新根会话默认启用官方 Agent Teams（已有选择优先，不覆盖历史会话） |
@@ -302,12 +328,13 @@ start ──► spawn/send ──► 队员执行 ──► record（带 teamTas
 
 | 文档 | 内容 |
 | --- | --- |
-| [CHANGELOG.md](CHANGELOG.md) | 版本变更记录（当前 **0.6.1**） |
+| [CHANGELOG.md](CHANGELOG.md) | 版本变更记录（当前 **0.6.2**） |
+| [安装与升级指南](docs/INSTALL.md) | 市场/CLI/源码安装、junction 清理、版本声明与回滚 |
 | [0.6 优化说明](docs/OPTIMIZATION-0.6.md) | 0.6.0 的档位重排、思考强度与提示词瘦身 |
 | [架构说明](docs/ARCHITECTURE.md) | 执行模型、模块职责与维护边界 |
 | [验证指南](docs/VERIFICATION.md) | 测试入口、验证范围与实测结果 |
 | [审查台账](docs/AUDIT-2026-11-16.md) | 本轮审查与修复验收记录 |
-| [GitHub Releases](https://github.com/SSRYLJRSS/dsh-token2biq/releases) | 发布说明与版本分发（`v0.6.1`） |
+| [GitHub Releases](https://github.com/SSRYLJRSS/dsh-token2biq/releases) | 发布说明与版本分发（`v0.6.2`） |
 
 ---
 

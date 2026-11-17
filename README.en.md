@@ -8,10 +8,10 @@
 
 [![GitHub](https://img.shields.io/badge/GitHub-SSRYLJRSS%2Fdsh--token2biq-181717?logo=github)](https://github.com/SSRYLJRSS/dsh-token2biq)
 [![CI](https://github.com/SSRYLJRSS/dsh-token2biq/actions/workflows/ci.yml/badge.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-v0.6.1-3B82F6.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
+[![Version](https://img.shields.io/badge/version-v0.6.2-3B82F6.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
 [![Releases](https://img.shields.io/github/v/release/SSRYLJRSS/dsh-token2biq?display_name=tag&color=3B82F6)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-3B82F6.svg)](LICENSE)
-[![DSH](https://img.shields.io/badge/DSH-%3E%3D0.2.0--rc.1%20%3C0.3.0-10B981.svg)](https://github.com/deepseek-ai/deepseek-harness)
+[![DSH](https://img.shields.io/badge/DSH-%3E%3D0.2.2--rc.3%20%3C0.3.0-10B981.svg)](https://github.com/deepseek-ai/deepseek-harness)
 
 [简体中文](README.md) · **English**
 
@@ -44,15 +44,53 @@ Token 2b IQ is **not** another agent runtime. It sits on top of the official Age
 
 ## Install
 
-```sh
-# From GitHub source (no build step; this repo is the plugin)
-dsh plugin --profile web add github:SSRYLJRSS/dsh-token2biq
+### 1) Desktop plugin market (recommended)
 
-# Or local link (development)
-dsh plugin --profile desktop add link:./dsh-token2biq
+Open **DeepSeek Harness Desktop → Settings → Plugins**, search `dsh-token2biq`, and click Install. **Fully quit and restart DSH** afterwards.
+
+> The market installs the prebuilt tarball (zero dependencies, no install scripts), so it never triggers pnpm's `allowBuilds` build approval.
+
+### 2) `dsh plugin` CLI (prebuilt, recommended)
+
+```sh
+# Pinned version (reproducible)
+dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/download/v0.6.2/dsh-token2biq-0.6.2.tgz
+
+# Or always the latest release
+dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/latest/download/dsh-token2biq.tgz
 ```
 
-> Replace `web` with your profile name (e.g. `desktop`). Host-side JS is loaded at startup — **a full DSH restart is required** after install/upgrade. Client changes require rebuilt host client artifacts and a page refresh. Development HMR additionally requires `pnpm run dev:web` running from the same checkout; saving source alone does not update the running GUI.
+> Replace `desktop` with your profile name (e.g. `web`).
+
+### 3) From GitHub source (development/troubleshooting only)
+
+```sh
+git clone https://github.com/SSRYLJRSS/dsh-token2biq.git
+dsh plugin --profile desktop add link:/absolute/path/to/dsh-token2biq
+```
+
+> `link:` creates a directory junction at `node_modules/dsh-token2biq` in the profile. **Remove it before switching back to a market/cloud install**, otherwise pnpm fails during import with `ERR_PNPM_EPERM ... rename ... dsh-token2biq_tmp_... -> dsh-token2biq` and the install appears to hang forever.
+
+Windows — remove the stale junction (link only; the source checkout is untouched):
+
+```powershell
+$p = "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-token2biq"
+if (Test-Path $p) { (Get-Item $p -Force).Delete() }
+```
+
+macOS / Linux:
+
+```sh
+rm -f ~/.dsh/profiles/desktop/node_modules/dsh-token2biq
+```
+
+### Version & compatibility
+
+- Package version: `0.6.2`
+- DSH compatibility: `>=0.2.2-rc.3 <0.3.0-0`, declared in both `engines.dsh` and `dsh.compatibility.dsh`
+- The market and host read `engines.dsh`, so there is no "version undeclared / compatibility unknown" state
+
+> Host-side JS is loaded at startup — **a full DSH restart is required** after install/upgrade. Client changes require rebuilt host client artifacts and a page refresh. Development HMR additionally requires `pnpm run dev:web` running from the same checkout; saving source alone does not update the running GUI.
 
 ## Quick start
 
@@ -109,6 +147,8 @@ Settings live in `~/.dsh/token2biq/settings.json`. Hard-enforced on `record`: `f
 
 On load the plugin provisions two DSH host settings; they take effect after a **DSH restart**:
 
+> Verified on DSH 0.2.2-rc.3 with the Desktop profile: both entries are written; an existing entry with the same id is left untouched.
+
 | Written automatically | Location | Effect |
 | --- | --- | --- |
 | `- id: agent-team` → `defaultEnabled: true` | `~/.dsh/profiles/<profile>/cordis.patch.yml` | New root sessions start with official Agent Teams enabled (existing choices win) |
@@ -124,12 +164,13 @@ Disable with `autoProvision: false`, re-run with `token2biq action=provision`, r
 
 | Document | Contents |
 | --- | --- |
-| [CHANGELOG.md](CHANGELOG.md) | Release notes (currently **0.6.1**) |
+| [CHANGELOG.md](CHANGELOG.md) | Release notes (currently **0.6.2**) |
+| [Install & upgrade guide](docs/INSTALL.md) | Market/CLI/source install, junction cleanup, version declaration, rollback |
 | [0.6 optimization notes](docs/OPTIMIZATION-0.6.md) | 0.6.0 tier rebalance, thinking effort, prompt slimming |
 | [Architecture](docs/ARCHITECTURE.md) | Execution model, module responsibilities, maintenance boundaries |
 | [Verification](docs/VERIFICATION.md) | Test entry points, verified scope, measured results |
 | [Audit report](docs/AUDIT-2026-11-16.md) | Review and fix acceptance record |
-| [GitHub Releases](https://github.com/SSRYLJRSS/dsh-token2biq/releases) | Release notes and version distribution (`v0.6.1`) |
+| [GitHub Releases](https://github.com/SSRYLJRSS/dsh-token2biq/releases) | Release notes and version distribution (`v0.6.2`) |
 
 ---
 
