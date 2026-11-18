@@ -17,8 +17,8 @@
 ```
 $ npm run ci          # 干净 clone（b219c03 → 07cba42）
 [check] 13 个文件通过（逐文件 node --check）
-ℹ tests 368
-ℹ pass 367
+ℹ tests 373
+ℹ pass 372
 ℹ fail 0
 [pack] 21 个文件；lib 模块 13 个齐全，无 test/docs/scripts/tgz 泄漏
 ```
@@ -54,3 +54,18 @@ $ npm run ci          # 干净 clone（b219c03 → 07cba42）
 - 档位仍是「强提示 + 回执硬门禁」，不是内核级拦截。
 - `taskType=auto` 是关键词判定，宁可误判为 code（更严格的流水线），也不误判为 investigation（会跳过实现阶段）。
 - 面板趋势是纯前端按 `createdAt` 分桶，依赖 runs 列表本身完整。
+## 独立评审（发布前）
+
+0.7.0 候选版本在发布前交给一名**未参与实现**的评审代理复审 `b219c03..07cba42`。第一轮结论 **FAIL**，列出 7 项问题；全部修复后进入第二轮。
+
+| # | 问题 | 修复 | 回归用例 |
+| --- | --- | --- | --- |
+| 1 | CODE_SIGNALS 漏收「优化/修改/调整/编写/添加/集成/调试」，会把代码任务判成调查任务而跳过 generate | 补齐中英文代码动词 | 评审回归：代码动词必须覆盖… |
+| 2 | 设置面板把非 strict 折成 off，用户设的 auto 保存一次即被改回 | v3ToDraft 保留 auto + 新增 auto 单选/说明 | 面板渲染冒烟 |
+| 3 | 工具 schema 缺 taskType，testsRun 只收 string | schema 增加 taskType enum；testsRun.items 改 anyOf string/object | check 逐文件语法 |
+| 4 | INVESTIGATION_PLANS.S3 的 judge/redteam 只在 optionalStages、未进 stages（死配置） | stages 补齐 7 阶段，maxAgents 7 | S3 调查计划在 risk=high 下能展开 judge/redteam |
+| 5 | 多候选调查运行无法 finish(PASS)：judge 只从 generate 收候选 | 候选来源改为 generate 或 synth | 多候选调查运行可 judge 择优并 finish(PASS) |
+| 6 | README / CHANGELOG 被回退到 0.6.2（0.6.3 条目丢失） | 以 b219c03 的 0.6.3 文档为基线重做 0.7.0 增量 | grep 0.6.3 CHANGELOG.md 仍命中 |
+| 7 | synth 缺角色映射、planFor 忽略 taskType、未知阶段提示未列 synth | 分别补齐 | synth 回执使用 synthesizer 角色 / planFor 能按 taskType 出计划 |
+
+修复后：`npm run ci` → 373 例（372 pass / 1 skip / 0 fail）、check 13 文件、pack 21 文件。

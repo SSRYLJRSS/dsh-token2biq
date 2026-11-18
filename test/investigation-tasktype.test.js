@@ -44,7 +44,8 @@ test('调查类计划：不含 generate，改由 synth 成稿', () => {
   assert.ok(!inv.stages.includes('generate'), '调查类不应有 generate 阶段');
   assert.ok(inv.stages.includes('synth'), '调查类必须有 synth 成稿阶段');
   assert.ok(inv.stages.includes('verify'), '调查类必须有独立验证');
-  assert.deepEqual(inv.stages, INVESTIGATION_PLANS.S3.stages);
+  // 未传 risk → 只展开 coreStages（judge/redteam 是 risk=high 的可选阶段）。
+  assert.deepEqual(inv.stages, INVESTIGATION_PLANS.S3.coreStages);
 
   const code = generatePlan('S3', { goal: '实现登录', taskType: 'code' });
   assert.equal(code.taskType, 'code');
@@ -108,3 +109,53 @@ test('代码任务在 strict 下仍要求 generate 前有 spec（门禁没被放
   assert.equal(r.ok, false, '无 spec 的 generate 必须被拒');
   assert.match(String(r.error), /spec|验收/);
 });
+
+
+// ---- 独立评审发现的回归用例（0.7.0 发布前修复） ----
+
+test('评审回归：代码动词必须覆盖 优化/修改/调整/编写/添加/集成/调试', () => {
+  assert.equal(detectTaskType('分析并评估登录模块的性能并优化'), 'code', '「优化」必须判为代码任务');
+  assert.equal(detectTaskType('审查并评估这段代码，修改其中的问题'), 'code', '「修改」必须判为代码任务');
+  assert.equal(detectTaskType('调整现有接口并集成到主流程'), 'code');
+  assert.equal(detectTaskType('编写单元测试并调试失败用例'), 'code');
+});
+
+test('评审回归：S3 调查计划在 risk=high 下能展开 judge/redteam', () => {
+  const p = generatePlan('S3', { goal: '调查并回顾历史对话记录', taskType: 'investigation', risk: 'high' });
+  assert.ok(p.stages.includes('judge'), 'risk=high 应展开 judge');
+  assert.ok(p.stages.includes('redteam'), 'risk=high 应展开 redteam');
+  assert.ok(p.stages.includes('synth'));
+});
+
+test('评审回归：多候选调查运行可 judge 择优并 finish(PASS)', () => {
+  const s = mk({ pipelineGate: 'strict' });
+  const st = s.start({ goal: '调查并回顾历史对话记录', mode: 'S3', taskType: 'investigation', candidates: 2 });
+  const runId = st.run.id;
+  assert.equal(s.record({ runId, stage: 'research', status: 'done', summary: '调研完成' }).ok, true);
+  assert.equal(s.record({ runId, stage: 'synth', status: 'done', files: ['a.md'], diffSummary: '报告 A', candidateId: 1 }).ok, true);
+  assert.equal(s.record({ runId, stage: 'synth', status: 'done', files: ['b.md'], diffSummary: '报告 B', candidateId: 2 }).ok, true);
+  assert.equal(s.record({ runId, stage: 'review', status: 'done', verdict: 'PASS', owner: 'reviewer-1' }).ok, true);
+  const j = s.record({ runId, stage: 'judge', status: 'done', verdict: 'PASS', selectedCandidate: '2', owner: 'judge-1' });
+  assert.equal(j.ok, true, 'judge 必须能选中 synth 产出的候选：' + (j.error || ''));
+  assert.equal(s.record({ runId, stage: 'regression', status: 'done', verdict: 'PASS', testsRun: [{ cmd: 'node --test', ok: true }] }).ok, true);
+  const f = s.finish({ runId, verdict: 'PASS' });
+  assert.equal(f.ok, true, '多候选调查运行必须能交付：' + (f.error || ''));
+});
+
+test('评审回归：synth 回执使用 synthesizer 角色而非 worker', () => {
+  const s = mk();
+  const st = s.start({ goal: '调查并回顾历史对话记录', mode: 'S2', taskType: 'investigation' });
+  const rec = s.record({ runId: st.run.id, stage: 'synth', status: 'done', files: ['r.md'], diffSummary: 'x' });
+  assert.equal(rec.ok, true);
+  assert.equal(rec.task.role, 'synthesizer');
+});
+
+test('评审回归：planFor 能按 taskType 出计划', () => {
+  const s = mk();
+  const code = s.planFor('S3', '实现登录', 'code');
+  const inv = s.planFor('S3', '调查并回顾历史对话', 'investigation');
+  assert.ok(code.stages.includes('generate'));
+  assert.ok(!inv.stages.includes('generate'));
+  assert.ok(inv.stages.includes('synth'));
+});
+
