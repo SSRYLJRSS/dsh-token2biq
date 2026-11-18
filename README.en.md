@@ -8,7 +8,7 @@
 
 [![GitHub](https://img.shields.io/badge/GitHub-SSRYLJRSS%2Fdsh--token2biq-181717?logo=github)](https://github.com/SSRYLJRSS/dsh-token2biq)
 [![CI](https://github.com/SSRYLJRSS/dsh-token2biq/actions/workflows/ci.yml/badge.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-v0.6.3-3B82F6.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
+[![Version](https://img.shields.io/badge/version-v0.6.2-3B82F6.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
 [![Releases](https://img.shields.io/github/v/release/SSRYLJRSS/dsh-token2biq?display_name=tag&color=3B82F6)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-3B82F6.svg)](LICENSE)
 [![DSH](https://img.shields.io/badge/DSH-%3E%3D0.2.2--rc.3%20%3C0.3.0-10B981.svg)](https://github.com/deepseek-ai/deepseek-harness)
@@ -28,7 +28,8 @@ DSH Agent Teams already answers "can multiple agents collaborate?" (`subagent`, 
 | How many agents, which stages, how many review rounds — guesswork | **S1–S4 / Auto tiers** turn "how many roles and stages" into a coarse knob |
 | The doer is also the judge — approving its own work | Staged pipeline + **independent blind review / cross-vendor review** (enforceable) |
 | No clear picture of tokens spent, progress, or why it failed | Per-stage **receipts + token ledger + run panel**, exportable as Markdown |
-| Complex work gets "one-shot" delivered with no verification gate | Optional `pipelineGate=strict`: no acceptance criteria → no implementation; no `testsRun` → no delivery |
+| Complex work gets "one-shot" delivered with no verification gate | Optional `pipelineGate=strict` (or `auto`): no acceptance criteria → no implementation; no **proven** `testsRun` → no delivery |
+| Research/audit tasks get forced through a code pipeline (no artefact to "generate") | `taskType=investigation` runs **research → synth → review → verify**, with **no `generate`** |
 
 > ⚠️ **Honest disclaimer**: in a small A/B (3 self-contained tasks), the strict pipeline did **not** improve correctness (both arms were already 100%) — it only added review overhead, with zero rework. So `pipelineGate` defaults to `off`. Keep it off for small tasks; its value only shows up on hard tasks where the generator actually makes mistakes.
 
@@ -64,7 +65,7 @@ dsh plugin --profile desktop add github:SSRYLJRSS/dsh-token2biq
 
 ```sh
 # Pinned version (reproducible)
-dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/download/v0.6.3/dsh-token2biq-0.6.3.tgz
+dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/download/v0.6.2/dsh-token2biq-0.6.2.tgz
 
 # Or always the latest release
 dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/latest/download/dsh-token2biq.tgz
@@ -96,7 +97,7 @@ rm -f ~/.dsh/profiles/desktop/node_modules/dsh-token2biq
 
 ### Version & compatibility
 
-- Package version: `0.6.3`
+- Package version: `0.6.2`
 - DSH compatibility: `>=0.2.2-rc.3 <0.3.0-0`, declared in both `engines.dsh` and `dsh.compatibility.dsh`
 - The market and host read `engines.dsh`, so there is no "version undeclared / compatibility unknown" state
 
@@ -116,6 +117,8 @@ rm -f ~/.dsh/profiles/desktop/node_modules/dsh-token2biq
 | **S2** | 3 | plan → generate → review → verify (4 stages) | ×5 |
 | **S3** | 5 | core 5: research → plan → generate → review → regression; high risk adds judge / redteam (7 stages total) | ×10 |
 | **S4** | 8 | full 7: research → plan → generate → review → judge → redteam → regression, with two-way parallel review (two independent models blind-review the generate output; any FAIL fails the stage) | ×16 |
+
+> **Since 0.7.0: research/document tasks use a different pipeline.** With `taskType=investigation` (or `auto` resolving to it), stages become **research → synth → review → verify / regression** — there is no `generate`; `synth` (role `synthesizer`) produces the report/document, and its receipt is validated like any worker receipt (`files` + `diffSummary`). S1 collapses to research→synth→verify and S4 adds judge/redteam. This removes the deadlock where an investigation task could never satisfy a code pipeline that demands an implementation artefact.
 | **Auto** | — | keyword screen → low-effort model check → fallback to keywords | — |
 
 > S3's judge / redteam are **high-risk add-ons**: they run only when `start` passes `risk: "high"` (or `strict`); `regression` is a core stage and always runs, so normal tasks run the core 5 stages. S4's "two-way review" runs the same `review` stage with two independent models in parallel blind review (any FAIL fails the stage); other stages are not parallelized.
@@ -140,14 +143,14 @@ When a stage calls a model, you choose not only *which* model but *how hard it t
 
 ## Configuration (what is enforced vs. advisory)
 
-Settings live in `~/.dsh/token2biq/settings.json`. Hard-enforced on `record`: `forceTeam` (S2/S3/S4 require `teamTaskId`+`owner`), `allowModels`, `independentReview` (owner ≠ generator), and `pipelineGate=strict`. Per-role `rolePools` are **advisory**; `roleModels` is a read-only derived field and is never persisted — `rolePools` are written into the playbook, executed by the Lead via `subagent(provider/model)`.
+Settings live in `~/.dsh/token2biq/settings.json`. Hard-enforced on `record`: `forceTeam` (S2/S3/S4 require `teamTaskId`+`owner`), `allowModels`, `independentReview` (owner ≠ generator), `pipelineGate=strict|auto`, and `taskType` (fixed into the run snapshot at `start`). `pipelineGate=auto` resolves per run: investigation tasks are always `off`; code tasks get `strict` only at S3/S4. Per-role `rolePools` are **advisory**; `roleModels` is a read-only derived field and is never persisted — `rolePools` are written into the playbook, executed by the Lead via `subagent(provider/model)`.
 
 ## Design limits (please read before installing)
 
 1. A tier is **a strong prompt + hard receipt gates, not a kernel-level interceptor** of every tool call.
 2. Model-routed stages must be executed by the Lead with `subagent`; `subagent` can carry an explicit LLM provider/model.
 3. `pipelineGate` defaults to `off` (see the A/B note above).
-4. "Real token" is process-wide (host `llm/stream` usage carries no `runId`), so it can be higher than one run's true cost.
+4. "Real token" is attributed per **session → run** (host `llm/stream` usage carries no `runId`, only a `sessionId`), falling back to the process-wide active run when no mapping exists — so concurrent runs no longer blend, but one run's figure can still include usage from subagent sessions of that same run.
 5. `generate` is serial by default (shared cwd, no file lock); parallel tasks need disjoint `writeScopes`.
 6. HTTP routes are gated by the official `ctx.connection.requestRejection` (untrusted Host/Origin → 403, unauthenticated → 401), with `application/json` body parsing and a 1 MB `readJson` cap; access control is delegated to the host's `requestRejection` (the plugin keeps no separate Origin allowlist).
 
@@ -182,13 +185,13 @@ Disable with `autoProvision: false`, re-run with `token2biq action=provision`, r
 
 | Document | Contents |
 | --- | --- |
-| [CHANGELOG.md](CHANGELOG.md) | Release notes (currently **0.6.3**) |
+| [CHANGELOG.md](CHANGELOG.md) | Release notes (currently **0.6.2**) |
 | [Install & upgrade guide](docs/INSTALL.md) | Market/CLI/source install, junction cleanup, version declaration, rollback |
 | [0.6 optimization notes](docs/OPTIMIZATION-0.6.md) | 0.6.0 tier rebalance, thinking effort, prompt slimming |
 | [Architecture](docs/ARCHITECTURE.md) | Execution model, module responsibilities, maintenance boundaries |
 | [Verification](docs/VERIFICATION.md) | Test entry points, verified scope, measured results |
 | [Audit report](docs/AUDIT-2026-11-16.md) | Review and fix acceptance record |
-| [GitHub Releases](https://github.com/SSRYLJRSS/dsh-token2biq/releases) | Release notes and version distribution (`v0.6.3`) |
+| [GitHub Releases](https://github.com/SSRYLJRSS/dsh-token2biq/releases) | Release notes and version distribution (`v0.6.2`) |
 
 ---
 

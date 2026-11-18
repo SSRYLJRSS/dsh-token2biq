@@ -42,11 +42,19 @@ test('P1-1：FAIL 收口不受评审门禁影响（失败运行必须能结束�
   assert.equal(s.finish({ runId, verdict: 'FAIL', rationale: '放弃' }).ok, true);
 });
 
-test('P1-2：testsRun 全 ok:null（只报命令名）→ finish 拒绝', () => {
+test('P1-2：testsRun 全 ok:null（只报命令名）→ record 提前拒收，且带可执行提示', () => {
   const s = mk();
   const runId = baseRun(s);
+  // 0.7.0：不再让用户一路跑到 finish 才看到「缺验证证据」——record 阶段就用可执行提示拒收。
   const v = s.record({ runId, stage: 'verify', status: 'done', verdict: 'PASS', testsRun: [{ cmd: 'node --test', ok: null }] });
-  assert.equal(v.ok, true, 'record 允许先收下（结果未知），但 finish 必须据此拒绝');
+  assert.equal(v.ok, false, 'ok:null 不能当验证证据，record 就要拦下');
+  assert.match(String(v.hint || ''), /ok: true|testsPassed/, '提示必须告诉用户两种合法写法');
+  // 双保险：绕过 record 直接注入，finish 仍必须独立拦下。
+  s.store.addTask(runId, {
+    stage: 'verify', status: 'done',
+    receipt: { verdict: 'PASS', evidence: [], testsRun: [{ cmd: 'node --test', ok: null }], testsPassed: null },
+    tokensIn: 1, tokensOut: 1,
+  });
   const f = s.finish({ runId, verdict: 'PASS' });
   assert.equal(f.ok, false, 'ok:null 不能当验证证据');
   assert.match(String(f.error), /验证|testsRun|verify/);

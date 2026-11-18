@@ -9,7 +9,7 @@
 
 [![GitHub](https://img.shields.io/badge/GitHub-SSRYLJRSS%2Fdsh--token2biq-181717?logo=github)](https://github.com/SSRYLJRSS/dsh-token2biq)
 [![CI](https://github.com/SSRYLJRSS/dsh-token2biq/actions/workflows/ci.yml/badge.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-v0.6.3-3B82F6.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
+[![Version](https://img.shields.io/badge/version-v0.6.2-3B82F6.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
 [![Releases](https://img.shields.io/github/v/release/SSRYLJRSS/dsh-token2biq?display_name=tag&color=3B82F6)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-3B82F6.svg)](LICENSE)
 [![DSH](https://img.shields.io/badge/DSH-%3E%3D0.2.2--rc.3%20%3C0.3.0-10B981.svg)](https://github.com/deepseek-ai/deepseek-harness)
@@ -86,7 +86,7 @@ dsh plugin --profile desktop add github:SSRYLJRSS/dsh-token2biq
 
 ```sh
 # 固定版本（可复现）
-dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/download/v0.6.3/dsh-token2biq-0.6.3.tgz
+dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/download/v0.6.2/dsh-token2biq-0.6.2.tgz
 
 # 或始终取最新版
 dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/latest/download/dsh-token2biq.tgz
@@ -118,7 +118,7 @@ rm -f ~/.dsh/profiles/desktop/node_modules/dsh-token2biq
 
 ### 版本与兼容性
 
-- 包版本：`0.6.3`
+- 包版本：`0.6.2`
 - DSH 兼容范围：`>=0.2.2-rc.3 <0.3.0-0`，同时写在 `package.json` 的 `engines.dsh` 与 `dsh.compatibility.dsh`
 - 市场与宿主读取 `engines.dsh` 判定兼容；不会再显示“无版本声明 / 兼容未知”
 
@@ -178,7 +178,7 @@ start ──► spawn/send ──► 队员执行 ──► record（带 teamTas
 | `generate` 生成 | `files[]` + `diffSummary`（可选 `testsRun[]`） |
 | `research` / `plan` 结论 | `summary` 或 `diffSummary`（`files` 可选） |
 | `review` / `judge` / `redteam` 裁判 | `verdict`(PASS\|FAIL)，FAIL 必填 `issues[]` |
-| `verify` / `regression` 验证 | `verdict`，FAIL 必填 `evidence[]`；strict 下须带非空 `testsRun` |
+| `verify` / `regression` 验证 | `verdict`，FAIL 必填 `evidence[]`；strict 下 `verdict=PASS` 时须带**已通过**的证据：`testsRun:[{cmd, ok:true}]` 或 `testsRun:["…"]` + `testsPassed:true` |
 
 `record` 还可以带 `tokensIn / tokensOut`（可选，缺省按字符估算）与 `model`（`provider::model`，用于白名单硬校验）。
 
@@ -198,6 +198,8 @@ start ──► spawn/send ──► 队员执行 ──► record（带 teamTas
 | **S2 标准** | 3 | plan → generate → review → verify（4 阶段） | ×5 |
 | **S3 完整** | 5 | 核心 5 阶段：research → plan → generate → review → regression；高风险追加 judge / redteam（完整 7 阶段） | ×10 |
 | **S4 完整加强** | 8 | 完整 7 阶段：research → plan → generate → review → judge → redteam → regression；评审双路并行（review 由两个独立模型并行盲审，任一 FAIL 即该阶段 FAIL） | ×16 |
+
+> **0.7.0 起：调查/文档类任务走另一套流水线。** `taskType=investigation`（或 `auto` 判定为调查）时，阶段变为 **research → synth → review → verify / regression**——没有 `generate`，改由 `synth`（synthesizer）产出报告/文档（回执同样要 `files` + `diffSummary`）。S1 收缩为 research→synth→verify，S4 追加 judge/redteam。这样「回顾/调查/审计」类任务不必再为了满足代码流水线而伪造实现产物，也不会因为「没有 generate」而永远 `finish` 不了。
 | **Auto 自动** | — | 关键词先筛 → 拿不准用低思考模型复核 → 失败回退关键词 | — |
 
 > 0.5.0 起提供**成本闸门**（`settings.tokenBudget`，0=不限）：消耗到 80% 时面板与 `action=state` 提示收敛，到 100% 时熔断——不再新建任务，由 Lead 用现有回执收口。它只拦「新建」，不会掐断已完成的工作。日常仍用「档位 = 参与角色数」做粗粒度控制。
@@ -255,7 +257,8 @@ start ──► spawn/send ──► 队员执行 ──► record（带 teamTas
 | `allowModels` | 模型白名单 | ✅ **硬校验**：`record` 上报 `model` 且不在白名单 → 拒收（不上报则不判）。通过 `settings.json` 或 `action=settings` 配置（面板未内置白名单入口） |
 | `independentReview` | 评审/裁判/红队必须由非执行者盲审 | ✅ **硬校验**：`owner` 不能是本次 generate 执行者（自评拒收） |
 | `tokenBudget` | 每运行 token 预算（`0`=不限） | ✅ **硬生效**：≥80% 提示收敛，≥100% 熔断——不再新建任务，由 Lead 用现有回执收口 |
-| `pipelineGate`（`off`/`strict`） | 严格流水线硬门禁 | ✅ **硬校验**：见下 |
+| `pipelineGate`（`off`/`strict`/`auto`） | 严格流水线硬门禁 | ✅ **硬校验**：见下。`auto`=按任务类型+档位自动：调查任务 off；代码任务仅 S3/S4 开 strict |
+| `taskType`（`auto`/`code`/`investigation`） | 任务类型，决定用哪套流水线 | ✅ **硬生效**：`start` 时定死并落到运行快照。`investigation` 走 research→synth→review→verify（**无 generate**）；`auto` 按目标文本判定（出现代码动作词一律按 code） |
 | `rolePools`（按角色指定模型） | 每阶段用哪个模型；8 个 key 永远存在，空数组=跟随主对话；数组顺序即优先级 | ⚠️ **建议**：写进执行手册，插件不强制切换。`roleModels` 是只读派生字段（池首项），不会落盘 |
 | `parallelReviews`（S4 并行审模型数） | 完整加强 S4 的 `review` 阶段并行盲审数（1..5，实际最多 2 路） | ⚠️ **建议**：写进执行手册，由 Lead 用 subagent 落地；实际并行数 = min(该值, 已选模型数, 2) |
 | 档位 / 阶段流程 | 参与角色与阶段数量 | ⚠️ **强提示**：注入系统提示 + 手册 + `record` 记账约束，但**不是内核级硬拦截**每一步工具调用 |
@@ -263,7 +266,7 @@ start ──► spawn/send ──► 队员执行 ──► record（带 teamTas
 ### `pipelineGate=strict` 到底硬在哪
 
 - **spec 前置**：`record generate` 前必须已有 `spec`（`start` 传 `acceptance`，或先 `record plan/research` 带验收标准），否则拒收。
-- **验证证据**：`record verify|regression` 必须带**非空** `testsRun`；`finish` 前必须有完成的 verify/regression 且 `verdict=PASS` 并带非空 `testsRun`，否则不许交付。
+- **验证证据**：`record verify|regression` 必须带**非空** `testsRun`；`verdict=PASS` 时还必须是**已通过**的证据——每项 `ok:true`，或配 `testsPassed:true` 显式声明。只写命令名（`ok:null`）会在 `record` 阶段就被拒收并给出两种合法写法（0.7.0 起），不再拖到 `finish` 才报一句看不懂的错。**FAIL 回执不受此限**——它本身就是在报告失败。`finish` 前必须有完成的 verify/regression 且 `verdict=PASS`，否则不许交付。
 - **候选择优**：`start candidates=N`（1..5）开启多候选；每个 `generate` 带 `candidateId`，`judge` 带 `selectedCandidate`，否则拒收。
 
 > 默认 `off`。只在「大改 / 高风险」任务手动开 `strict`，用完改回 `off`。
@@ -346,13 +349,13 @@ start ──► spawn/send ──► 队员执行 ──► record（带 teamTas
 
 | 文档 | 内容 |
 | --- | --- |
-| [CHANGELOG.md](CHANGELOG.md) | 版本变更记录（当前 **0.6.3**） |
+| [CHANGELOG.md](CHANGELOG.md) | 版本变更记录（当前 **0.6.2**） |
 | [安装与升级指南](docs/INSTALL.md) | 市场/CLI/源码安装、junction 清理、版本声明与回滚 |
 | [0.6 优化说明](docs/OPTIMIZATION-0.6.md) | 0.6.0 的档位重排、思考强度与提示词瘦身 |
 | [架构说明](docs/ARCHITECTURE.md) | 执行模型、模块职责与维护边界 |
 | [验证指南](docs/VERIFICATION.md) | 测试入口、验证范围与实测结果 |
 | [审查台账](docs/AUDIT-2026-11-16.md) | 本轮审查与修复验收记录 |
-| [GitHub Releases](https://github.com/SSRYLJRSS/dsh-token2biq/releases) | 发布说明与版本分发（`v0.6.3`） |
+| [GitHub Releases](https://github.com/SSRYLJRSS/dsh-token2biq/releases) | 发布说明与版本分发（`v0.6.2`） |
 
 ---
 

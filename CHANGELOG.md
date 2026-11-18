@@ -1,16 +1,18 @@
 # 变更日志
 
-## [0.6.3] - 2026-11-17
+## [0.7.0] - 2026-11-18
 
-### 严格门禁 + 跨 profile 自动配置 + 健壮性
+### 调查/文档类任务独立流水线 + 门禁自动化 + 逐会话 token 归属
 
-- 版本 `0.6.2` → `0.6.3`（patch；兼容范围保持不变 `dsh >=0.2.2-rc.3 <0.3.0-0`），无破坏性 API 变更。
-- **P0 活动 profile 判定与跨 profile 自动配置**：新增 `resolveProfileDetailed`，按「显式参数 > settings.provisionProfile > DSH_PROFILE > 模块安装路径反解（`/profiles/<name>/node_modules/`）> 枚举 profiles/*（排除 `.bak/.tmp/.old` 等备份目录，仅唯一命中）」确定活动 profile；多 profile 且无可靠来源时回传候选并拒绝静默写入（不再默认 `desktop` 写偏）。已有同 id 的 `subagent-model-selection-settings` 条目时用 `planModelMerge` 增量补齐缺失模型，只插入新行、保留用户键值。`applyProvision` 回传 `profileTargeted/profileSource/candidates/merged`，并由 `service.provisionStatus` 承接。
-- **P0 安装链路 TLS / junction**：README 与 INSTALL 补充 `NODE_OPTIONS=--use-system-ca`（GitHub 源 TLS 证书链）与 `node_modules/dsh-token2biq` junction 清理命令，覆盖 0.6.2 市场安装卡住根因。
-- **P1 strict judge / testsRun 门禁**：新增 `testsProven`——`testsRun` 任一项 `ok:false` 一票否决（即使回执自报 `testsPassed:true`）；否则要求 `testsRun` 非空且逐项 `ok:true`，杜绝「只报命令名未报结果」蒙混通过；配套 strict finish 验证必须位于最新 `generate` 之后。
-- **P1 提示词压缩**：精简 Lead 锁定档位纪律与队员 blocked 处理措辞（`orchestrator.buildPolicy`），减少冗余说明，保留「回执 / 不轮询 / 只改 writeScopes」硬约束。
-- **P2 健壮性**：`report.buildReport` 对缺失/半成品 run 全面空值兜底（ledger/plan/stages/tasks/verdict 等），任何字段缺失不再 TypeError；`makeLlmClassifier` 移除硬编码的 `magpie/workbuddy/deepseek-v4.1-flash` 回退路由：优先使用宿主当前默认模型，取不到则返回 null 交由上层回退关键词分类，避免模型不存在时分类静默失败、掩盖真实配置问题。
-- **测试**：新增 `strict-finish-gates`、`policy-degrade`、`report`、`llm-classifier` 4 个测试；更新 api-contract / autoprovision / bugfix-1113 / core-audit-regression / manifest / payload-size-061 / pipeline / spawn-prompt-cache 8 个测试。`npm run ci` 350/349/0/1、`npm run test:smoke` 5/5 全绿。
+这一版来自一次真实踩坑：用 S3 跑「回顾调查」类任务时，代码流水线先要求 `generate`（调查任务没有实现产物），而 `finish(PASS)` 又要求「最新产物之后有验证」，形成无法收口的死结；同时 `testsRun` 只写命令名（`["node --test"]`）会被归一成 `ok:null`，finish 报一句「缺验证证据」，用户完全看不出是形状不对。
+
+- **新增任务类型 `taskType`（auto / code / investigation）**：`start` 可显式传，默认 `auto` 按目标文本判定。判定保守——**只要出现代码动作词（实现/重构/修复/开发/部署…）一律按 code 处理**，避免「复盘并优化插件」这类目标被误判成调查任务而跳过实现。
+- **调查类流水线 `INVESTIGATION_PLANS`**：`research → synth（成稿）→ review → verify / regression`，**不含 generate**；S1 收缩为 `research → synth → verify`，S4 追加 judge/redteam。新增 `synth` 阶段（角色 synthesizer，回执按 worker 契约校验：需 `files` + `diffSummary`）。
+- **`pipelineGate` 新增 `auto` 模式**：按「任务类型 + 档位」自动决定生效门禁——调查任务一律 off；代码任务只在 S3/S4 启用 strict，S1/S2 小改保持宽松。默认值仍为 `off`（向后兼容），需要自动化时设 `auto`。
+- **`testsRun` 证据形状提前校验（P0 体验修复）**：strict 下 `record verify/regression` 且 `verdict=PASS` 时，若 `testsRun` 里没有任何 `ok:true` 也没有 `testsPassed:true`，立即拒收并给出两种合法写法；不再拖到 `finish` 才报一句看不懂的错。**FAIL 回执不受此限**（它本身就是在报告失败）。
+- **逐会话 token 归属**：`noteUsage` 优先按「会话 → 运行」映射归集真实用量（`start` 记录 sessionId，`finish` 清理），并发运行不再互相串账；无映射时退回旧的全局活动运行口径。
+- **面板**：概览区新增近 7 天 / 近 30 天通过率趋势；设置→高级页新增「任务类型」三选一。
+- **测试**：新增 `test/investigation-tasktype.test.js`（9 例：类型判定、计划形态、auto 门禁、synth 契约、调查类 strict 下可正常 finish(PASS)、代码任务门禁未被放宽）。全量 `npm test` 359 例通过。
 
 ## [0.6.2] - 2026-11-17
 
