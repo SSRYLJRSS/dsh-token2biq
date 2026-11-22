@@ -9,7 +9,7 @@
 
 [![GitHub](https://img.shields.io/badge/GitHub-SSRYLJRSS%2Fdsh--token2biq-181717?logo=github)](https://github.com/SSRYLJRSS/dsh-token2biq)
 [![CI](https://github.com/SSRYLJRSS/dsh-token2biq/actions/workflows/ci.yml/badge.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-v0.7.0-3B82F6.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
+[![Version](https://img.shields.io/badge/version-v0.7.1-3B82F6.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
 [![Releases](https://img.shields.io/github/v/release/SSRYLJRSS/dsh-token2biq?display_name=tag&color=3B82F6)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-3B82F6.svg)](LICENSE)
 [![DSH](https://img.shields.io/badge/DSH-%3E%3D0.2.2--rc.3%20%3C0.3.0-10B981.svg)](https://github.com/deepseek-ai/deepseek-harness)
@@ -86,7 +86,7 @@ dsh plugin --profile desktop add github:SSRYLJRSS/dsh-token2biq
 
 ```sh
 # 固定版本（可复现）
-dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/download/v0.7.0/dsh-token2biq-0.7.0.tgz
+dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/download/v0.7.1/dsh-token2biq-0.7.1.tgz
 
 # 或始终取最新版
 dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/latest/download/dsh-token2biq.tgz
@@ -118,7 +118,7 @@ rm -f ~/.dsh/profiles/desktop/node_modules/dsh-token2biq
 
 ### 版本与兼容性
 
-- 包版本：`0.7.0`
+- 包版本：`0.7.1`
 - DSH 兼容范围：`>=0.2.2-rc.3 <0.3.0-0`，同时写在 `package.json` 的 `engines.dsh` 与 `dsh.compatibility.dsh`
 - 市场与宿主读取 `engines.dsh` 判定兼容；不会再显示“无版本声明 / 兼容未知”
 
@@ -349,13 +349,13 @@ start ──► spawn/send ──► 队员执行 ──► record（带 teamTas
 
 | 文档 | 内容 |
 | --- | --- |
-| [CHANGELOG.md](CHANGELOG.md) | 版本变更记录（当前 **0.7.0**） |
+| [CHANGELOG.md](CHANGELOG.md) | 版本变更记录（当前 **0.7.1**） |
 | [安装与升级指南](docs/INSTALL.md) | 市场/CLI/源码安装、junction 清理、版本声明与回滚 |
 | [0.6 优化说明](docs/OPTIMIZATION-0.6.md) | 0.6.0 的档位重排、思考强度与提示词瘦身 |
 | [架构说明](docs/ARCHITECTURE.md) | 执行模型、模块职责与维护边界 |
 | [验证指南](docs/VERIFICATION.md) | 测试入口、验证范围与实测结果 |
 | [审查台账](docs/AUDIT-2026-11-16.md) | 本轮审查与修复验收记录 |
-| [GitHub Releases](https://github.com/SSRYLJRSS/dsh-token2biq/releases) | 发布说明与版本分发（`v0.7.0`） |
+| [GitHub Releases](https://github.com/SSRYLJRSS/dsh-token2biq/releases) | 发布说明与版本分发（`v0.7.1`） |
 
 ---
 

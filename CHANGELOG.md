@@ -1,5 +1,32 @@
 # 变更日志
 
+## [0.7.1] - 2026-11-22
+
+### 维护版：兼容修复与稳定性（无新功能）
+
+本版只维护 0.7.0 的既有功能，不新增工具、路由、设置项或 UI 功能；在 DSH 0.2.2-rc.5 上完成全量审计与回归。
+
+- **A1 readJson 健壮性**：请求体改为按块收集后用 `Buffer.concat(...).toString('utf8')` 解码，修复中文/emoji 跨块损坏；非法 JSON 返回 400，请求中止返回 `__aborted`，不再静默当成空 body。
+- **A2 分类 usage 隔离**：`Auto` 分类期间不再用全局 `_classifying` 计数误吞其它并发流的 usage；每条分类流使用独立 token，只跳过自身。
+- **A3/A8 compactToolResult**：第 2 级不再回灌超大 `roster`，保住 `created/modelRouting`；`null/undefined` 返回合法 JSON 字符串。
+- **A4 error/aborted 用量**：`llm/stream` 的 `finish` 若为 `error/aborted` 且无 usage，补记 `requests`，不伪造 token。
+- **S-A1 autoBoard 落盘**：全量建档失败时 `orchestrated` 不再先写 true 后内存改 false；持久化值与实际结果一致。
+- **C1 autoprovision**：支持列表式 `providers[].name/models[].id`；映射式 provider 回归不变。
+- **C2 settings 中文档位**：`defaultMode` 复用 `orchestrator.normalizeMode`，支持轻量/标准/完整/完整加强/普通/进阶/大改。
+- **C4 synth 思考强度**：`normalizeReasoning` 的角色集合加入 `synth`，不改变既有 8 角色 rolePools/UI。
+- **S3 report 兜底**：非法事件时间不再抛 `RangeError`；`modelRouting` 含 null 不再抛。
+- **B3 client 负缓存**：verdict 查询失败不再写 null 负缓存，下一轮会重试。
+
+### 验证
+
+- `node --test test/maintenance-round2.test.js` → 12 pass / 0 fail
+- `npm test` → 390 tests / 389 pass / 1 skip / 0 fail
+- `npm run check` → 13 files pass
+- `npm run pack:check` → 21 files pass
+- `npm run test:smoke` → 5/5 scripts pass
+- 安装副本 6 个改动文件 `node --check` 通过，源码与安装副本 sha256 一致。
+
+> 上传说明：`v0.7.1` 的 Release 资产需同时提供 `dsh-token2biq-0.7.1.tgz` 与 `dsh-token2biq.tgz`（供 `releases/latest/download` 使用）。
 ## [0.7.0] - 2026-11-18
 
 ### 调查/文档类任务独立流水线 + 门禁自动化 + 逐会话 token 归属

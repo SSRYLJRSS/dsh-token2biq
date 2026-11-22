@@ -1,6 +1,6 @@
 # 安装与升级指南
 
-本文覆盖四条安装路径、常见失败原因和修复命令。目标版本：**0.7.0**，DSH 兼容范围 **>=0.2.2-rc.3 <0.3.0-0**。
+本文覆盖四条安装路径、常见失败原因和修复命令。目标版本：**0.7.1**，DSH 兼容范围 **>=0.2.2-rc.3 <0.3.0-0**。
 
 ## 1. 推荐：Desktop 插件市场
 
@@ -24,14 +24,14 @@ dsh plugin --profile desktop add github:SSRYLJRSS/dsh-token2biq
 
 ```sh
 dsh plugin --profile desktop why dsh-token2biq
-# 输出应显示 dsh-token2biq 0.7.0 及其来源 GitHub
+# 输出应显示 dsh-token2biq 0.7.1 及其来源 GitHub
 ```
 
 ## 3. 预构建 tarball（可选）
 
 ```sh
 # 固定版本（可复现，推荐）
-dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/download/v0.7.0/dsh-token2biq-0.7.0.tgz
+dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/download/v0.7.1/dsh-token2biq-0.7.1.tgz
 
 # 或始终取最新 release
 dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/latest/download/dsh-token2biq.tgz
@@ -93,7 +93,7 @@ pnpm 11 对 git 依赖默认不执行 `prepare` 构建脚本。本包没有 buil
 
 ## 版本与兼容声明
 
-- 包版本：`0.7.0`
+- 包版本：`0.7.1`
 - `package.json` 顶层 `engines.dsh`：`>=0.2.2-rc.3 <0.3.0-0`
 - `package.json` 的 `dsh.compatibility.dsh`：同上
 - 市场与宿主优先读取 `engines.dsh`；如果缺失，会显示“无版本声明 / 兼容未知”
