@@ -83,3 +83,11 @@ test('start: 直接传 profile.complexity 也能配平', () => {
   assert.ok(res.plan.stages.includes('generate'));
   assert.ok(res.plan.stages.length < 5);
 });
+
+test('startWithAuto: 模型判 doc 任务等同调查（无 generate 成稿）', async () => {
+  const s = mk();
+  s.classifier = async () => ({ tier: 'S2', taskType: 'doc', complexity: 'simple', risk: 'low', worthTeam: false });
+  const res = await s.startWithAuto({ goal: '整理一份兼容性总结报告', mode: 'S2' }, {});
+  assert.equal(res.taskType, 'investigation');
+  assert.ok(!res.plan.stages.includes('generate'));
+});
