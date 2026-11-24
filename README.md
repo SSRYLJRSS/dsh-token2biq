@@ -105,9 +105,7 @@ dsh plugin --profile desktop add github:SSRYLJRSS/dsh-token2biq
 ```sh
 # 固定版本（可复现）
 dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/download/v0.9.1/dsh-token2biq-0.9.1.tgz
-
-# 或始终取最新版
-dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/latest/download/dsh-token2biq.tgz
+# 其它 / 更新版本：到 Releases 页面复制对应 vX.Y.Z 的 tarball 链接（市场同样按唯一附件安装）
 ```
 
 > 包内零依赖、无安装脚本，不需要 `allowBuilds`。若报 `UNABLE_TO_VERIFY_LEAF_SIGNATURE`，说明本机 Node 不信任 GitHub Release 的证书链：改用方式二，或在启动 DSH 前设置 `NODE_OPTIONS=--use-system-ca`。

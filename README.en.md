@@ -80,9 +80,7 @@ dsh plugin --profile desktop add github:SSRYLJRSS/dsh-token2biq
 ```sh
 # Pinned version (reproducible)
 dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/download/v0.9.1/dsh-token2biq-0.9.1.tgz
-
-# Or always the latest release
-dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/latest/download/dsh-token2biq.tgz
+# Other / newer versions: copy the matching vX.Y.Z tarball URL from the Releases page
 ```
 
 > Zero dependencies, no install scripts, so no `allowBuilds` approval. If you hit `UNABLE_TO_VERIFY_LEAF_SIGNATURE`, Node does not trust the GitHub Release certificate chain: use option 2, or set `NODE_OPTIONS=--use-system-ca` before launching DSH.
