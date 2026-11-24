@@ -52,3 +52,14 @@ test('按类型证据：调查类 verify 既无 evidence 也无 testsRun 仍被�
   const vf = s.record({ runId, stage: 'verify', status: 'done', verdict: 'PASS' });
   assert.equal(vf.ok, false, '调查类 verify 无 evidence 无 testsRun 应被拒');
 });
+
+test('按类型证据：调查类 evidence 仅空白字符仍被拒', () => {
+  const s = mk();
+  const st = s.start({ goal: '调查并回顾一段历史对话记录', mode: 'S2', taskType: 'investigation' });
+  const runId = st.run.id;
+  assert.equal(s.record({ runId, stage: 'research', status: 'done', summary: 'ok' }).ok, true);
+  assert.equal(s.record({ runId, stage: 'synth', status: 'done', files: ['r.md'], diffSummary: '稿' }).ok, true);
+  assert.equal(s.record({ runId, stage: 'review', status: 'done', verdict: 'PASS', owner: 'rev-1' }).ok, true);
+  const vf = s.record({ runId, stage: 'verify', status: 'done', verdict: 'PASS', evidence: ['   ', '  '] });
+  assert.equal(vf.ok, false, '仅空白 evidence 应被拒');
+});
