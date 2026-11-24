@@ -32,16 +32,18 @@ test('detectTaskType: 空/无关回退 code', () => {
   assert.equal(detectTaskType('随便看看'), 'code');
 });
 
-test('applyProfileToPlan: 代码 simple/medium 配平且保留验收阶段', () => {
+test('applyProfileToPlan: 代码 simple 保留评审+验收；medium 保持整档不降', () => {
   const p3 = generatePlan('S3', { goal: 'x', taskType: 'code' });
   const simple = applyProfileToPlan(p3, { complexity: 'simple' });
   assert.ok(simple.stages.includes('generate'));
+  assert.ok(simple.stages.includes('review'), 'simple 也要保留独立评审（降档不降严谨）');
   assert.ok(simple.stages.includes('verify') || simple.stages.includes('regression'));
   assert.ok(!simple.stages.includes('research'));
   assert.ok(simple.stages.length < p3.stages.length);
+  assert.equal(simple.trimmedForSimplicity, true);
+  // medium 不再降档：尊重用户所选档位完整跑
   const med = applyProfileToPlan(p3, { complexity: 'medium' });
-  assert.ok(med.stages.includes('review'));
-  assert.ok(med.stages.length < p3.stages.length);
+  assert.deepEqual(med.stages, p3.stages);
 });
 
 test('applyProfileToPlan: 调查 simple 无 generate、保留 synth 与验收', () => {
@@ -106,4 +108,33 @@ test('applyProfileToPlan: 高风险不裁剪（保留红队/裁决）', () => {
   const p = generatePlan('S3', { goal: 'x', taskType: 'code', risk: 'high' });
   const r = applyProfileToPlan(p, { complexity: 'simple', risk: 'high' });
   assert.deepEqual(r.stages, p.stages);
+});
+
+test('start: strictRigor=true 时即使 simple 也不降档（可强制满档严谨）', () => {
+  const s = mk();
+  const full = generatePlan('S3', { goal: 'x', taskType: 'code' });
+  const res = s.start({ goal: 'x', mode: 'S3', taskType: 'code', acceptance: 'a', profile: { taskType: 'code', complexity: 'simple', risk: 'low' }, strictRigor: true });
+  assert.deepEqual(res.plan.stages, full.stages, 'strictRigor 必须按整档、不裁剪');
+  assert.equal(res.rigor && res.rigor.forced, true);
+});
+
+test('start: S1/S2 简单任务本就精简，不误报降档（rigor=null 且不裁剪）', () => {
+  const s = mk();
+  const s1full = generatePlan('S1', { goal: 'x', taskType: 'code' });
+  const r1 = s.start({ goal: 'x', mode: 'S1', taskType: 'code', profile: { taskType: 'code', complexity: 'simple', risk: 'low' } });
+  assert.deepEqual(r1.plan.stages, s1full.stages);
+  assert.equal(r1.rigor, null);
+  const s2full = generatePlan('S2', { goal: 'x', taskType: 'code' });
+  const r2 = s.start({ goal: 'x', mode: 'S2', taskType: 'code', profile: { taskType: 'code', complexity: 'simple', risk: 'low' } });
+  assert.deepEqual(r2.plan.stages, s2full.stages);
+  assert.equal(r2.rigor, null);
+});
+
+test('start: 简单任务降档时返回透明 rigor 说明，且代码保留评审', () => {
+  const s = mk();
+  const res = s.start({ goal: 'x', mode: 'S3', taskType: 'code', profile: { taskType: 'code', complexity: 'simple', risk: 'low' } });
+  assert.equal(res.plan.trimmedForSimplicity, true);
+  assert.ok(res.plan.stages.includes('review'), '降档仍保留评审');
+  assert.equal(res.rigor && res.rigor.downgraded, true);
+  assert.ok(res.rigor.from > res.rigor.to);
 });
