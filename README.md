@@ -413,6 +413,12 @@ lib/
 
 ---
 
+## 发版约定（保证市场自动更新）
+
+- 每个 Release **只上传一个** tarball，文件名固定为 `dsh-token2biq.tgz`（**不带版本号**）。
+- 市场条目与 `releases/latest/download/dsh-token2biq.tgz` 都依赖这个固定资产名：每次发版市场自动跟到最新，无需再改目录。
+- 版本号写进 `package.json` / git tag；需要钉版本的用户用 `github:SSRYLJRSS/dsh-token2biq#vX.Y.Z`。
+
 ## License
 
 MIT · 见 [LICENSE](LICENSE)
