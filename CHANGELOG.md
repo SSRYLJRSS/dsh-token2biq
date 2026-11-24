@@ -1,5 +1,25 @@
 # 变更日志
 
+## [0.9.0] - 2026-11-24
+
+### 新增：按类型证据 + 分类缓存 + P2 优化 + 提示词压缩（P1/P2）
+
+- **按类型证据矩阵（P1）**：`strict` 下调查/文档类任务的 `verify/regression` 可用 `evidence`（引用/核对结论）作为验证证据，不再被迫伪造 `testsRun`；代码类仍强制全绿 `testsRun`。record 与 finish 两处门禁口径一致；evidence 需至少一个非空白元素。
+- **分类结果缓存（P1，token 治理）**：`_classify(goal)` 按目标缓存模型画像（上限 200 FIFO），只存有效结果、失败/空壳不缓存；`updateSettings` 变更后清空，避免同目标重复触发 LLM 画像。
+- **条件合并 plan→spec（P2）**：`code/simple` 且 `start` 已给 `acceptance/spec` 时省略 `plan` 阶段（省一个 agent）；无 spec、complex、risk=high 时仍保留（防 strict 死锁、保留红队/裁决）。
+- **writeScopes 暴露（P2）**：`start({ writeScopes })` 按阶段声明写域并透传到 `playbook.steps`，为并行 fanout 提供安全基础（非法值安全忽略）。
+- **提示词压缩**：teammate 分支 −5%（每个子代理都继承）、Auto（非锁定）分支 −11%；锁定分支硬性纪律逐字保留。
+- **token 治理**：既有 `budgetGate`（≥80% 软提示、100% 硬熔断、未设预算=null）保持 opt-in 不变；叠加分类缓存与阶段配平进一步降 token。
+
+### 已知未做（默认关 / 后续，不影响本版可用性）
+
+- UI 内直接改「任务画像」、opt-in 省钱模式（机械阶段更低 effort / 更省模型）——可选增强，需配套 UI 与实测，暂留后续。
+
+### 验证
+
+- `npm run ci` → check 13 files / tests 417 / pass 416 / skip 1 / fail 0 / pack:check 全绿
+- 安装冒烟：tarball 解包后 lib 全模块 `node --check` 通过
+
 ## [0.8.0] - 2026-11-24
 
 ### 新增：任务画像 AI 分类 + 策略矩阵（P0）
