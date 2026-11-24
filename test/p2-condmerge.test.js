@@ -32,3 +32,10 @@ test('P2 条件合并：complex 不裁剪，plan 保留', () => {
   const res = s.start({ goal: 'x', mode: 'S3', taskType: 'code', acceptance: 'a', profile: { taskType: 'code', complexity: 'complex', risk: 'low' } });
   assert.ok(res.plan.stages.includes('plan'));
 });
+
+test('P2 条件合并：high 风险不合并（保留 plan 与红队/裁决）', () => {
+  const s = mk();
+  const res = s.start({ goal: 'x', mode: 'S3', taskType: 'code', acceptance: 'a', profile: { taskType: 'code', complexity: 'simple', risk: 'high' } });
+  assert.ok(res.plan.stages.includes('plan'), '高风险应保留 plan');
+  assert.ok(res.plan.stages.includes('judge') || res.plan.stages.includes('redteam'), '高风险应展开红队/裁决');
+});
