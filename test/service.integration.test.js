@@ -191,7 +191,8 @@ test('Auto 混合模式：关键词拿不准时用注入分类器复核，失败
   assert.equal(amb.tier, 'S3');
   assert.equal(called, 1);
   svc.classifier = async () => null; // 模型失败
-  const fb = await svc.autoDecide(AMBIG);
+  // 分类结果按 goal 缓存（P1）：同一目标会命中上面的成功缓存，这里用新表述验证「模型失败→回退」。
+  const fb = await svc.autoDecide(AMBIG + '（再确认一遍）');
   assert.equal(fb.decidedBy, 'fallback');
   fs.rmSync(dir, { recursive: true, force: true });
 });
