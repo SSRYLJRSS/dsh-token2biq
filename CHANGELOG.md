@@ -1,5 +1,19 @@
 # 变更日志
 
+## [0.8.0] - 2026-11-24
+
+### 新增：任务画像 AI 分类 + 策略矩阵（P0）
+
+- **任务画像**：`Auto` 与「锁定档位」下都会让模型对目标做一次轻量画像（`taskType`/`complexity`/`risk`）；显式 `taskType` 优先，无模型时回退关键词，失败不影响启动。
+- **策略矩阵配平**：新增纯函数 `applyProfileToPlan`，按复杂度在档位上限内裁剪阶段（代码/调查 simple→3 阶段、medium→4 阶段，complex 保持全量），始终保留验收阶段（verify 或 regression）。
+- **关键词兜底加固**：`detectTaskType` 改为否定语境感知（「不改代码/无需修改」不再判 code），单个调查信号即可判 investigation；新增 `doc` 任务等同调查流水线。
+- 效果：只读/调查类任务不再被判 code 而卡在 testsRun 死锁；简单任务阶段数下降，节省 token。
+
+### 验证
+
+- `npm test` → 400 tests / 399 pass / 1 skip / 0 fail
+- `npm run check` → 13 files pass；`npm run pack:check` 全绿
+
 ## [0.7.1] - 2026-11-22
 
 ### 维护版：兼容修复与稳定性（无新功能）
