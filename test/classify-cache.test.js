@@ -21,6 +21,27 @@ test('分类缓存：同一目标只调用一次 classifier', async () => {
   assert.equal(calls, 1, '同一目标第二次应命中缓存');
 });
 
+test('分类缓存：无有效信息的结果不缓存（允许重试）', async () => {
+  const s = mk();
+  let calls = 0;
+  s.classifier = async () => { calls += 1; return { tier: null, taskType: null, complexity: null, risk: null, reason: '无' }; };
+  await s.startWithAuto({ goal: '实现X', mode: 'S3' }, {});
+  await s.startWithAuto({ goal: '实现X', mode: 'S3' }, {});
+  assert.equal(calls, 2, '无有效 tier/画像 不应缓存');
+});
+
+test('分类缓存：updateSettings 清空缓存', async () => {
+  const s = mk();
+  let calls = 0;
+  s.classifier = async () => { calls += 1; return { tier: 'S3', taskType: 'code', complexity: 'medium', risk: 'low' }; };
+  await s.startWithAuto({ goal: '实现Y', mode: 'S3' }, {});
+  await s.startWithAuto({ goal: '实现Y', mode: 'S3' }, {});
+  assert.equal(calls, 1);
+  s.updateSettings({ forceTeam: 'off' });
+  await s.startWithAuto({ goal: '实现Y', mode: 'S3' }, {});
+  assert.equal(calls, 2, 'updateSettings 后缓存应失效');
+});
+
 test('分类缓存：空结果不缓存，允许重试', async () => {
   const s = mk();
   let calls = 0;
