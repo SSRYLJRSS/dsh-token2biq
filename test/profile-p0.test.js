@@ -91,3 +91,19 @@ test('startWithAuto: 模型判 doc 任务等同调查（无 generate 成稿）',
   assert.equal(res.taskType, 'investigation');
   assert.ok(!res.plan.stages.includes('generate'));
 });
+
+test('detectTaskType: 只/仅/别 不作否定，真实代码任务不回退（评审回归用例）', () => {
+  assert.equal(detectTaskType('分析后只修改一个文件'), 'code');
+  assert.equal(detectTaskType('分别实现登录与注册两个模块并分析性能'), 'code');
+  assert.equal(detectTaskType('分析这个模块并特别优化性能'), 'code');
+});
+
+test('detectTaskType: 远距离否定仍判 investigation', () => {
+  assert.equal(detectTaskType('评估插件兼容性，没有必要修改任何代码'), 'investigation');
+});
+
+test('applyProfileToPlan: 高风险不裁剪（保留红队/裁决）', () => {
+  const p = generatePlan('S3', { goal: 'x', taskType: 'code', risk: 'high' });
+  const r = applyProfileToPlan(p, { complexity: 'simple', risk: 'high' });
+  assert.deepEqual(r.stages, p.stages);
+});
