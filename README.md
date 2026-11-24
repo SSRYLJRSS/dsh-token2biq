@@ -9,7 +9,7 @@
 
 [![GitHub](https://img.shields.io/badge/GitHub-SSRYLJRSS%2Fdsh--token2biq-181717?logo=github)](https://github.com/SSRYLJRSS/dsh-token2biq)
 [![CI](https://github.com/SSRYLJRSS/dsh-token2biq/actions/workflows/ci.yml/badge.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-v0.7.1-3B82F6.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
+[![Version](https://img.shields.io/badge/version-v0.9.1-3B82F6.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
 [![Releases](https://img.shields.io/github/v/release/SSRYLJRSS/dsh-token2biq?display_name=tag&color=3B82F6)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-3B82F6.svg)](LICENSE)
 [![DSH](https://img.shields.io/badge/DSH-%3E%3D0.2.2--rc.3%20%3C0.3.0-10B981.svg)](https://github.com/deepseek-ai/deepseek-harness)
@@ -64,6 +64,24 @@ flowchart LR
 
 ---
 
+## v0.9 更新：更聪明，也更谨慎
+
+这一版把「怎么编排」从「按档位死配」升级为「先读懂任务，再谨慎决定」：
+
+- **AI 任务画像（P0）**：开跑前先让模型判断任务类型（写代码 / 查资料）、复杂度、风险，再选流水线；不再只靠关键词，把「看代码」误判成「写代码」的老问题基本消除。
+- **按复杂度配平（P0/P2）**：在所选档位上限内，只对**确实简单**的任务做「减法」，去掉冗余阶段；**中等 / 复杂 / 高风险一律按你选的档位完整跑**。
+- **谨慎降档（本版核心）**：降档只发生在「简单」任务，且**降档不降验收**——代码保留「评审 + 测试」，调查 / 文档保留「引用 / 事实核验」（防幻觉）。每次降档都会在 `start` 返回的 `rigor` 里写清原因；要绝对严谨可传 `strictRigor:true` 强制满档。
+- **按类型证据（P1）**：`strict` 门禁下，调查类用「引用核对」、代码类用「真实测试」作验收证据，不再互相为难、不再逼着造假。
+- **分类缓存 + 提示词压缩（P1/P2）**：同一目标不重复调用画像模型；队员提示词更短（实测约 −5%），省 token 而不降质。
+
+| 任务情形 | 会怎么跑 |
+| --- | --- |
+| 你选高档 + 中等 / 复杂 / 高风险 | 按你选的整档完整跑，一步不砍 |
+| 你选高档 + 确实简单（查资料 / 核真假） | 谨慎降一档，但保留「核验 / 评审」 |
+| 拿不准 | 宁可按高标准来，不乱降 |
+
+> 一句话：**你说得越大，它越不敢乱砍；只有小到查资料、核真假，才降一点，且一定留着「核验」这关。**
+
 ## 安装
 
 ### 方式一：Desktop 插件市场（推荐）
@@ -86,7 +104,7 @@ dsh plugin --profile desktop add github:SSRYLJRSS/dsh-token2biq
 
 ```sh
 # 固定版本（可复现）
-dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/download/v0.7.1/dsh-token2biq-0.7.1.tgz
+dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/download/v0.9.1/dsh-token2biq-0.9.1.tgz
 
 # 或始终取最新版
 dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/latest/download/dsh-token2biq.tgz
@@ -118,7 +136,7 @@ rm -f ~/.dsh/profiles/desktop/node_modules/dsh-token2biq
 
 ### 版本与兼容性
 
-- 包版本：`0.7.1`
+- 包版本：`0.9.1`
 - DSH 兼容范围：`>=0.2.2-rc.3 <0.3.0-0`，同时写在 `package.json` 的 `engines.dsh` 与 `dsh.compatibility.dsh`
 - 市场与宿主读取 `engines.dsh` 判定兼容；不会再显示“无版本声明 / 兼容未知”
 
@@ -349,13 +367,13 @@ start ──► spawn/send ──► 队员执行 ──► record（带 teamTas
 
 | 文档 | 内容 |
 | --- | --- |
-| [CHANGELOG.md](CHANGELOG.md) | 版本变更记录（当前 **0.7.1**） |
+| [CHANGELOG.md](CHANGELOG.md) | 版本变更记录（当前 **0.9.1**） |
 | [安装与升级指南](docs/INSTALL.md) | 市场/CLI/源码安装、junction 清理、版本声明与回滚 |
 | [0.6 优化说明](docs/OPTIMIZATION-0.6.md) | 0.6.0 的档位重排、思考强度与提示词瘦身 |
 | [架构说明](docs/ARCHITECTURE.md) | 执行模型、模块职责与维护边界 |
 | [验证指南](docs/VERIFICATION.md) | 测试入口、验证范围与实测结果 |
 | [审查台账](docs/AUDIT-2026-11-16.md) | 本轮审查与修复验收记录 |
-| [GitHub Releases](https://github.com/SSRYLJRSS/dsh-token2biq/releases) | 发布说明与版本分发（`v0.7.1`） |
+| [GitHub Releases](https://github.com/SSRYLJRSS/dsh-token2biq/releases) | 发布说明与版本分发（`v0.9.1`） |
 
 ---
 

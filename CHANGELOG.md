@@ -1,5 +1,20 @@
 # 变更日志
 
+## [0.9.1] - 2026-11-24
+
+### 谨慎降档策略 + README 大更新（行为优化，向后兼容）
+
+- **谨慎降档（核心）**：`applyProfileToPlan` 改为**只有 complexity=simple 才裁剪**；medium/complex/缺省一律按所选档位完整跑。降档保留「严谨下限」：代码保 `plan/generate/review/验收`（独立评审+测试），调查保 `research/synth/验收`（引用/事实核验）。零裁剪（S1/S2 本就精简）不再标记降档，避免误报。
+- **`strictRigor` 开关**：`start({strictRigor:true})` 完全跳过降档与条件合并，强制按所选档位满档执行。
+- **透明降档说明**：`start` 返回新增 `rigor` 字段（`{downgraded,from,to,reason}` 或 `{forced:true}`），文案按实际阶段生成（含 review 才写「独立评审」）。
+- **分类提示词优化**：要求模型「不要为省 token 故意低报难度，拿不准判高」，从源头减少误降。
+- **README**：同步新版编排逻辑（任务画像/配平/谨慎降档/按类型证据/缓存/提示词）与版本徽章、下载链接。
+
+### 验证
+
+- `npm run ci` → check 13 文件 / tests 420 / pass 419 / skip 1 / fail 0 / pack:check 全绿
+- 独立评审两轮：修复 2 处 rigor 误报后 PASS
+
 ## [0.9.0] - 2026-11-24
 
 ### 新增：按类型证据 + 分类缓存 + P2 优化 + 提示词压缩（P1/P2）

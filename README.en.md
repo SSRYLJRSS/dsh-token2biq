@@ -8,7 +8,7 @@
 
 [![GitHub](https://img.shields.io/badge/GitHub-SSRYLJRSS%2Fdsh--token2biq-181717?logo=github)](https://github.com/SSRYLJRSS/dsh-token2biq)
 [![CI](https://github.com/SSRYLJRSS/dsh-token2biq/actions/workflows/ci.yml/badge.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-v0.7.1-3B82F6.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
+[![Version](https://img.shields.io/badge/version-v0.9.1-3B82F6.svg)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
 [![Releases](https://img.shields.io/github/v/release/SSRYLJRSS/dsh-token2biq?display_name=tag&color=3B82F6)](https://github.com/SSRYLJRSS/dsh-token2biq/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-3B82F6.svg)](LICENSE)
 [![DSH](https://img.shields.io/badge/DSH-%3E%3D0.2.2--rc.3%20%3C0.3.0-10B981.svg)](https://github.com/deepseek-ai/deepseek-harness)
@@ -18,6 +18,20 @@
 </div>
 
 ---
+
+## What's new in v0.9
+
+- **AI task profiling (P0):** before starting, the model classifies task type (code vs research), complexity and risk, then picks the pipeline — no more keyword-only misclassification.
+- **Size-aware trimming (P0/P2):** within your chosen tier, only *genuinely simple* tasks get stages trimmed; medium / complex / high-risk always run the full tier.
+- **Cautious downgrade (this release):** downgrades only for simple work and never drop verification — code keeps review + tests, research keeps citation / fact checks. Each downgrade is reported in `start().rigor`; pass `strictRigor:true` to force the full tier.
+- **Type-aware evidence (P1):** under `strict`, investigation tasks pass with citations, code tasks with real `testsRun`.
+- **Classification cache + shorter prompts (P1/P2):** no duplicate profiling calls; ~5% shorter teammate prompt.
+
+| Situation | Pipeline |
+| --- | --- |
+| High tier + medium / complex / high-risk | Full tier, nothing trimmed |
+| High tier + genuinely simple | Cautious one-step downgrade, verification kept |
+| Unsure | Prefer the higher standard |
 
 ## What it solves
 
@@ -65,7 +79,7 @@ dsh plugin --profile desktop add github:SSRYLJRSS/dsh-token2biq
 
 ```sh
 # Pinned version (reproducible)
-dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/download/v0.7.1/dsh-token2biq-0.7.1.tgz
+dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/download/v0.9.1/dsh-token2biq-0.9.1.tgz
 
 # Or always the latest release
 dsh plugin --profile desktop add https://github.com/SSRYLJRSS/dsh-token2biq/releases/latest/download/dsh-token2biq.tgz
@@ -97,7 +111,7 @@ rm -f ~/.dsh/profiles/desktop/node_modules/dsh-token2biq
 
 ### Version & compatibility
 
-- Package version: `0.7.1`
+- Package version: `0.9.1`
 - DSH compatibility: `>=0.2.2-rc.3 <0.3.0-0`, declared in both `engines.dsh` and `dsh.compatibility.dsh`
 - The market and host read `engines.dsh`, so there is no "version undeclared / compatibility unknown" state
 
@@ -185,13 +199,13 @@ Disable with `autoProvision: false`, re-run with `token2biq action=provision`, r
 
 | Document | Contents |
 | --- | --- |
-| [CHANGELOG.md](CHANGELOG.md) | Release notes (currently **0.7.1**) |
+| [CHANGELOG.md](CHANGELOG.md) | Release notes (currently **0.9.1**) |
 | [Install & upgrade guide](docs/INSTALL.md) | Market/CLI/source install, junction cleanup, version declaration, rollback |
 | [0.6 optimization notes](docs/OPTIMIZATION-0.6.md) | 0.6.0 tier rebalance, thinking effort, prompt slimming |
 | [Architecture](docs/ARCHITECTURE.md) | Execution model, module responsibilities, maintenance boundaries |
 | [Verification](docs/VERIFICATION.md) | Test entry points, verified scope, measured results |
 | [Audit report](docs/AUDIT-2026-11-16.md) | Review and fix acceptance record |
-| [GitHub Releases](https://github.com/SSRYLJRSS/dsh-token2biq/releases) | Release notes and version distribution (`v0.7.1`) |
+| [GitHub Releases](https://github.com/SSRYLJRSS/dsh-token2biq/releases) | Release notes and version distribution (`v0.9.1`) |
 
 ---
 
